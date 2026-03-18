@@ -6,15 +6,15 @@ import { Image, Text, View } from "react-native";
 function TabsIcon({ focused, icon, title }: any) {
   if (focused) {
     return (
-      <View className="h-full w-full items-center justify-center">
+      <View className="h-full flex w-full items-center justify-center">
         <Image
           source={icon}
-          tintColor="#151312"
+          tintColor="#88A0B0"
           resizeMode="contain"
-          style={{ width: 20, height: 20 }}
+          style={{ width: 25, height: 25 }}
         />
 
-        <Text className="text-secondary font-semibold text-xs">{title}</Text>
+        <Text className="text-accentLight font-bold text-xs">{title}</Text>
       </View>
     );
   }
@@ -22,7 +22,7 @@ function TabsIcon({ focused, icon, title }: any) {
     <View className="h-full w-full items-center justify-center">
       <Image
         source={icon}
-        tintColor={focused ? "#151312" : "#A8B5DB"}
+        tintColor={focused ? "#E77023" : "#EAFBFF"}
         resizeMode="contain"
         style={{ width: 20, height: 20 }}
       />
@@ -36,16 +36,19 @@ const _layout = () => {
       screenOptions={{
         tabBarShowLabel: false,
         tabBarItemStyle: {
-          flex: 1,
+          width: "100%",
+          height: "100%",
           alignItems: "center",
           justifyContent: "center",
         },
         tabBarStyle: {
-          borderRadius: 30,
+          backgroundColor: "#263743",
+          borderColor: "#88A0B0",
+          borderRadius: 50,
           marginHorizontal: 20,
           marginBottom: 36,
-          height: 56,
-          position: "relative",
+          height: 52,
+          position: "absolute",
           overflow: "hidden",
           alignContent: "center",
           alignItems: "center",

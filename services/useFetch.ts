@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 
-const useFetch = <T>(
+export const useFetch = <T>(
   fetchFunction: () => Promise<T>,
   autoFetch: boolean = true,
 ) => {
