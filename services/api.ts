@@ -21,7 +21,7 @@ export const TMBD_config = {
   },
 };
 
-export const fetchPopularMovies = async ({ query }: { query: string }) => {
+export const fetchMovies = async ({ query }: { query: string }) => {
   const endpoint = query
     ? `${TMBD_config.baseURL}/search/movie?query=${encodeURIComponent(query)}`
     : `${TMBD_config.baseURL}/discover/movie?sort_by=popularity.desc`;

@@ -2,7 +2,7 @@ import { MovieCard } from "@/components/MovieCard";
 import SearchBar from "@/components/SearchBar";
 import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
-import { fetchPopularMovies } from "@/services/api";
+import { fetchMovies } from "@/services/api";
 import { useFetch } from "@/services/useFetch";
 import { useRouter } from "expo-router";
 import {
@@ -21,7 +21,7 @@ export default function Index() {
     data: movies,
     loading: moviesLoading,
     error: moviesError,
-  } = useFetch(() => fetchPopularMovies({ query: "" }));
+  } = useFetch(() => fetchMovies({ query: "" }));
   return (
     <View className="flex-1 bg-primary">
       <Image source={images.navybg} style={StyleSheet.absoluteFillObject} />
@@ -35,7 +35,7 @@ export default function Index() {
           source={icons.movie}
           resizeMode="contain"
           style={styles.movieIcon}
-        /> 
+        />
         {moviesLoading ? (
           <ActivityIndicator
             size="large"
@@ -49,6 +49,9 @@ export default function Index() {
             <SearchBar
               onPress={() => router.push("/search")}
               placeholder="Search for movies, TV shows, actors..."
+              
+
+
             />
             <>
               <Text className="text-lg text-white mt-4 mb-5">
