@@ -66,3 +66,12 @@ interface TrendingCardProps {
   movie: TrendingMovie;
   index: number;
 }
+
+interface TrendingMovie {
+  $id: string;
+  searchTerm: string;
+  count: number;
+  movie_id: number;
+  title: string;
+  poster_url: string;
+}

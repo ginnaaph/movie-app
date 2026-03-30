@@ -15,5 +15,9 @@
     "app/_layout.tsx",
     "nativewind-env.d.ts",
     "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "starter-for-react-native",
+    "node_modules"
   ]
 }
