@@ -14,6 +14,7 @@ interface Movie {
   vote_average: number;
   vote_count: number;
 }
+
 interface MovieDetails {
   adult: boolean;
   backdrop_path: string | null;
@@ -67,6 +68,11 @@ interface TrendingCardProps {
   index: number;
 }
 
+interface SavedMovieCardProps {
+  movie: SavedMovie;
+  index: number;
+}
+
 interface TrendingMovie {
   $id: string;
   searchTerm: string;
@@ -74,4 +80,14 @@ interface TrendingMovie {
   movie_id: number;
   title: string;
   poster_url: string;
+}
+
+interface SavedMovie {
+  $id: string;
+  movie_id: number;
+  title: string;
+  poster_url: string;
+  release_date: string;
+  saved: boolean;
+  vote_average: number;
 }

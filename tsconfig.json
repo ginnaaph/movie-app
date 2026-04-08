@@ -2,7 +2,8 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "./",
     "paths": {
       "@/*": ["./*"]
     }
@@ -16,8 +17,5 @@
     "nativewind-env.d.ts",
     "types/**/*.d.ts"
   ],
-  "exclude": [
-    "starter-for-react-native",
-    "node_modules"
-  ]
+  "exclude": ["starter-for-react-native", "node_modules"]
 }

@@ -57,3 +57,102 @@ export const getTrendingMovies = async (): Promise<
     return undefined;
   }
 };
+
+export const getSavedMovies = async (): Promise<SavedMovie[] | undefined> => {
+  try {
+    const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+      Query.equal("saved", true),
+      Query.orderDesc("$createdAt"),
+    ]);
+
+    return result.documents as unknown as SavedMovie[];
+  } catch (error) {
+    console.error("Error fetching saved movies:", error);
+    return undefined;
+  }
+};
+
+const getSavedMovieDocument = async (
+  movieId: number,
+): Promise<SavedMovie | null> => {
+  try {
+    const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+      Query.equal("movie_id", movieId),
+    ]);
+
+    if (result.documents.length === 0) {
+      return null;
+    }
+
+    return result.documents[0] as unknown as SavedMovie;
+  } catch (error) {
+    console.error("Error fetching saved movie:", error);
+    return null;
+  }
+};
+
+export const getSavedMovie = async (
+  movieId: number,
+): Promise<SavedMovie | null> => {
+  const movie = await getSavedMovieDocument(movieId);
+
+  if (!movie?.saved) {
+    return null;
+  }
+
+  return movie;
+};
+
+export const saveMovie = async (movie: MovieDetails): Promise<SavedMovie> => {
+  const existingMovie = await getSavedMovieDocument(movie.id);
+
+  if (existingMovie) {
+    const result = await databases.updateDocument(
+      DATABASE_ID,
+      COLLECTION_ID,
+      existingMovie.$id,
+      {
+        title: movie.title,
+        poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+        release_date: movie.release_date,
+        saved: true,
+        vote_average: movie.vote_average,
+      },
+    );
+
+    return result as unknown as SavedMovie;
+  }
+
+  const result = await databases.createDocument(
+    DATABASE_ID,
+    COLLECTION_ID,
+    ID.unique(),
+    {
+      movie_id: movie.id,
+      title: movie.title,
+      poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+      release_date: movie.release_date,
+      saved: true,
+      vote_average: movie.vote_average,
+    },
+  );
+
+  return result as unknown as SavedMovie;
+};
+
+export const removeSavedMovie = async (movieId: number): Promise<void> => {
+  const existingMovie = await getSavedMovieDocument(movieId);
+
+  if (!existingMovie) {
+    return;
+  }
+
+  await databases.updateDocument(
+    DATABASE_ID,
+    COLLECTION_ID,
+    existingMovie.$id,
+    {
+      saved: false,
+    },
+  );
+};

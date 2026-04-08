@@ -2,7 +2,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { Link } from "expo-router";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
-const TrendingCard = ({
+export const SavedMovieCard = ({
   movie: { movie_id, title, poster_url },
   index,
 }: TrendingCardProps) => {
@@ -35,5 +35,3 @@ const TrendingCard = ({
     </Link>
   );
 };
-
-export default TrendingCard;

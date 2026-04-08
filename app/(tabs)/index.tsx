@@ -60,13 +60,13 @@ export default function Index() {
             />
             {trendingMovies && (
               <View className="mt-2">
-                <Text className="text-lg text-white font-bold mb-3">
+                <Text className="text-xl text-white font-bold mb-3 mt-3">
                   Trending Movies
                 </Text>
                 <FlatList
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  className="mb-3 mt-3"
+                  className="mb-3 mt-3 text-white"
                   data={trendingMovies}
                   contentContainerStyle={{
                     gap: 16,
@@ -80,7 +80,7 @@ export default function Index() {
               </View>
             )}
             <>
-              <Text className="text-lg text-white mt-2 mb-5">
+              <Text className="text-xl font-semibold text-white mt-2 mb-5 ">
                 {" "}
                 Latest Movies
               </Text>
@@ -92,7 +92,7 @@ export default function Index() {
                 columnWrapperStyle={{
                   justifyContent: "flex-start",
                   gap: 20,
-                  paddingRight: 5,
+                  paddingLeft: 5,
                   marginBottom: 10,
                 }}
                 className="mt-2 pb-32"
