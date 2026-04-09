@@ -3,14 +3,16 @@ import { Link } from "expo-router";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 export const SavedMovieCard = ({
-  movie: { movie_id, title, poster_url },
+  movie: { movie_id, title, poster_url, release_date, vote_average },
   index,
-}: TrendingCardProps) => {
+}: SavedMovieCardProps) => {
   return (
     <Link href={`/movies/${movie_id}`} asChild>
       <TouchableOpacity className="w-32 relative pl-5">
         <Image
-          source={{ uri: poster_url }}
+          source={{
+            uri: poster_url || "https://placehold.co/600x400/1a1a1a.png",
+          }}
           className="w-32 h-48 rounded-lg"
           resizeMode="cover"
         />
@@ -31,7 +33,17 @@ export const SavedMovieCard = ({
         >
           {title}
         </Text>
+        <View className="flex-row items-center justify-between mt-1">
+          <Text className="text-xs text-gray-400">
+            {release_date?.split("-")[0] || "Movie"}
+          </Text>
+          <Text className="text-xs text-accent">
+            {vote_average ? `${Math.round(vote_average / 2)}/5` : ""}
+          </Text>
+        </View>
       </TouchableOpacity>
     </Link>
   );
 };
+
+export default SavedMovieCard;

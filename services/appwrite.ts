@@ -31,8 +31,8 @@ export const updateSeachCount = async (query: string, movie: Movie) => {
         searchTerm: query,
         count: 1,
         movie_id: movie.id,
+        saved: false,
         title: movie.title,
-
         poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
       });
     }
@@ -48,6 +48,7 @@ export const getTrendingMovies = async (): Promise<
   try {
     const result = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
       Query.limit(5),
+      Query.greaterThan("count", 0),
       Query.orderDesc("count"),
     ]);
 
@@ -112,11 +113,11 @@ export const saveMovie = async (movie: MovieDetails): Promise<SavedMovie> => {
       COLLECTION_ID,
       existingMovie.$id,
       {
+        searchTerm: movie.title,
+        count: existingMovie.count ?? 0,
         title: movie.title,
         poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
-        release_date: movie.release_date,
         saved: true,
-        vote_average: movie.vote_average,
       },
     );
 
@@ -128,12 +129,12 @@ export const saveMovie = async (movie: MovieDetails): Promise<SavedMovie> => {
     COLLECTION_ID,
     ID.unique(),
     {
+      searchTerm: movie.title,
+      count: 0,
       movie_id: movie.id,
       title: movie.title,
       poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
-      release_date: movie.release_date,
       saved: true,
-      vote_average: movie.vote_average,
     },
   );
 

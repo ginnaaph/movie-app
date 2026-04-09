@@ -1,7 +1,10 @@
 import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
+import SearchBar from "@/components/SearchBar";
+import SavedCard from "@/components/SavedMovieCard";
 import { getSavedMovies } from "@/services/appwrite";
 import { useIsFocused } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +17,7 @@ import {
 } from "react-native";
 
 const Saved = () => {
+  const router = useRouter();
   const isFocused = useIsFocused();
   const [movies, setMovies] = useState<SavedMovie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,55 +43,91 @@ const Saved = () => {
   }, [isFocused]);
 
   return (
-    <View className="bg-primary flex-1 px-10">
+    <View className="bg-primary flex-1">
       <Image source={images.navybg} style={StyleSheet.absoluteFillObject} />
       <ScrollView
-        className="px-5"
+        className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 0, minHeight: "100%" }}
+        contentContainerStyle={{ minHeight: "100%", paddingBottom: 24 }}
       >
         <Image
           source={icons.movie}
           resizeMode="contain"
           style={styles.movieIcon}
         />
-        <View className="mt-2">
-          <Text className="text-accent text-3xl font-medium">
-            {" "}
-            Saved Movies
-          </Text>
-        </View>
-        <View className="flex flex-row items-center mt-5 flex-1 gap-x-4">
-          <Image source={icons.saved} className="size-6" tintColor="#fff" />
-
-          <Text className="text-white text-center text-lg font-semibold">
-            {loading
-              ? "Loading..."
-              : error
-                ? `Error: ${error}`
-                : movies?.length
-                  ? `${movies.length} movies saved`
-                  : "No movies saved"}
-          </Text>
-        </View>
         {loading ? (
-          <ActivityIndicator size="large" color="#E77023" className="mt-10" />
-        ) : null}
-        <FlatList
-          data={movies}
-          renderItem={({ item, index }) => (
-            <SavedMovieCard movie={item} index={index} />
-          )}
-          keyExtractor={(item) => item.$id}
-          numColumns={2}
-          columnWrapperStyle={{
-            justifyContent: "flex-start",
-            gap: 8,
-            paddingRight: 12,
-          }}
-          className="mt-4 pb-32"
-          scrollEnabled={false}
-        />
+          <ActivityIndicator
+            size="large"
+            color="#0000ff"
+            className="mt-10 self-center"
+          />
+        ) : error ? (
+          <Text className="text-white mt-10">Error: {error}</Text>
+        ) : (
+          <View className="flex-1 mt-5">
+            <SearchBar
+              onPress={() => router.push("/search")}
+              placeholder="Find more movies to save..."
+            />
+
+            <View className="mt-6">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-xl text-white font-bold">
+                  Saved Movies
+                </Text>
+                <View className="flex-row items-center gap-x-2">
+                  <Image
+                    source={icons.saved}
+                    className="size-4"
+                    tintColor="#E77023"
+                  />
+                  <Text className="text-accent text-sm font-medium">
+                    {movies.length} saved
+                  </Text>
+                </View>
+              </View>
+
+              {movies.length > 0 ? (
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="mt-4"
+                  data={movies}
+                  contentContainerStyle={{
+                    gap: 16,
+                    paddingRight: 20,
+                  }}
+                  renderItem={({ item, index }) => (
+                    <SavedCard movie={item} index={index} />
+                  )}
+                  keyExtractor={(item) => item.$id}
+                  ItemSeparatorComponent={() => <View className="w-4" />}
+                />
+              ) : (
+                <View className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-5 py-6">
+                  <Text className="text-white text-lg font-semibold">
+                    No saved movies yet
+                  </Text>
+                  <Text className="text-light-200 mt-2 leading-5">
+                    Save a movie from the details page and it will show up here.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {movies.length > 0 ? (
+              <View className="mt-8 rounded-2xl border border-white/10 bg-white/5 px-5 py-5">
+                <Text className="text-white text-lg font-semibold">
+                  Your Library
+                </Text>
+                <Text className="text-light-200 mt-2 leading-5">
+                  Revisit movies you bookmarked and jump back into their details
+                  anytime.
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
