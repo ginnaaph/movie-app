@@ -34,7 +34,7 @@ export const SavedMovieCard = ({
           {title}
         </Text>
         <View className="flex-row items-center justify-between mt-1">
-          <Text className="text-xs text-gray-400">
+          <Text className="text-xs text-slateGrey">
             {release_date?.split("-")[0] || "Movie"}
           </Text>
           <Text className="text-xs text-accent">

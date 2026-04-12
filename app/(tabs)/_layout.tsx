@@ -9,12 +9,12 @@ function TabsIcon({ focused, icon, title }: any) {
       <View className="h-full flex w-full items-center justify-center">
         <Image
           source={icon}
-          tintColor="#88A0B0"
+          tintColor="#EAFBFF"
           resizeMode="contain"
           style={{ width: 25, height: 25 }}
         />
 
-        <Text className="text-accentLight font-bold text-xs">{title}</Text>
+        <Text className="text-accent font-medium text-xs">{title}</Text>
       </View>
     );
   }
@@ -22,7 +22,7 @@ function TabsIcon({ focused, icon, title }: any) {
     <View className="h-full w-full items-center justify-center">
       <Image
         source={icon}
-        tintColor={focused ? "#E77023" : "#EAFBFF"}
+        tintColor={focused ? "#5F9EA0" : "#EAFBFF"}
         resizeMode="contain"
         style={{ width: 20, height: 20 }}
       />
@@ -44,7 +44,7 @@ const _layout = () => {
         tabBarStyle: {
           backgroundColor: "#263743",
           borderColor: "#88A0B0",
-          borderRadius: 50,
+          borderRadius: 40,
           marginHorizontal: 20,
           marginBottom: 36,
           height: 52,
@@ -56,7 +56,7 @@ const _layout = () => {
           paddingTop: 10,
         },
         tabBarIconStyle: {
-          width: 20,
+          width: 40,
           height: 20,
         },
       }}

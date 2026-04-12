@@ -1,7 +1,7 @@
+import SavedCard from "@/components/SavedMovieCard";
+import SearchBar from "@/components/SearchBar";
 import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
-import SearchBar from "@/components/SearchBar";
-import SavedCard from "@/components/SavedMovieCard";
 import { getSavedMovies } from "@/services/appwrite";
 import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -81,7 +81,7 @@ const Saved = () => {
                     className="size-4"
                     tintColor="#E77023"
                   />
-                  <Text className="text-accent text-sm font-medium">
+                  <Text className="text-accentLight text-sm font-medium">
                     {movies.length} saved
                   </Text>
                 </View>
@@ -116,11 +116,11 @@ const Saved = () => {
             </View>
 
             {movies.length > 0 ? (
-              <View className="mt-8 rounded-2xl border border-white/10 bg-white/5 px-5 py-5">
-                <Text className="text-white text-lg font-semibold">
+              <View className="mt-8 rounded-2xl border border-white/10 bg-slateGrey px-5 py-5">
+                <Text className="text-secondary text-lg font-bold">
                   Your Library
                 </Text>
-                <Text className="text-light-200 mt-2 leading-5">
+                <Text className="text-white mt-2 leading-5">
                   Revisit movies you bookmarked and jump back into their details
                   anytime.
                 </Text>

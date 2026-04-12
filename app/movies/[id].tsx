@@ -7,6 +7,7 @@ import {
   saveMovie,
 } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -27,10 +28,8 @@ interface MovieInfoProps {
 
 const MovieInfo = ({ label, value }: MovieInfoProps) => (
   <View className="flex-col items-start justify-center mt-5">
-    <Text className="text-light-200 font-semibold text-md">{label}</Text>
-    <Text className="text-light-100 font-normal text-sm mt-2">
-      {value || "N/A"}
-    </Text>
+    <Text className="text-accent font-semibold text-lg">{label}</Text>
+    <Text className="text-text font-normal text-sm mt-2">{value || "N/A"}</Text>
   </View>
 );
 
@@ -90,8 +89,8 @@ const MovieDetails = () => {
     );
 
   return (
-    <View className=" bg-[#F2F4F7] flex-1">
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+    <View className=" bg-primary flex-1">
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         <View>
           <Image
             source={{
@@ -100,7 +99,7 @@ const MovieDetails = () => {
             className="w-full h-[550px]"
             resizeMode="stretch"
           />
-          <TouchableOpacity className="absolute bottom-5 right-5 rounded-full size-14 bg-white flex items-center justify-center">
+          <TouchableOpacity className="absolute bottom-5 right-5 rounded-full size-14 bg-text/80 flex items-center justify-center">
             <Image
               source={icons.play}
               className="w-6 h-7 ml-1"
@@ -108,46 +107,49 @@ const MovieDetails = () => {
             />
           </TouchableOpacity>
         </View>
-        <View className="flex-col items-start justify-center mt-5 px-5">
-          <View className="w-full flex-row items-start justify-between gap-x-4">
-            <Text className="text-primary font-bold text-xl flex-1">
+        <LinearGradient
+          colors={["transparent", "transparent", "#20265C"]}
+          locations={[0, 0.3, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.5, y: 2 }}
+          className=" px-5 pt-32"
+        >
+          <View className="w-full flex-row items-center justify-between gap-x-4 ml-2">
+            <Text className="text-text font-bold text-4xl flex-1 pt-5">
               {movie?.title}
             </Text>
             <SaveButton onPress={handleSavePress} isSaved={saved} />
           </View>
-          <View className="flex-row items-center gap-x-1 mt-2">
-            <Text className="text-accent text-sm">
+          <View className="flex-row items-center gap-x-1 mt-2 ml-4">
+            <Text className="text-accentLight text-md">
               {movie?.release_date?.split("-")[0]} •
             </Text>
-            <Text className="text-accent text-sm">{movie?.runtime}m</Text>
+            <Text className="text-accentLight text-md">{movie?.runtime}m</Text>
           </View>
-          <Text className="text-accent text-sm mt-3">
+          <Text className="text-accent text-md mt-3 ml-4 italic">
             {saveLoading
               ? "Updating saved movies..."
-              : saved
-                ? "Saved to your list"
-                : "Tap the bookmark to save this movie"}
+              : saved || "Saved to your list"}
           </Text>
 
-          <View className="flex-row items-center bg-secondary/20 px-2 py-1 rounded-md gap-x-1 mt-2">
+          <View className="flex-row items-center bg-slateGrey w-1/3 px-2 py-1 rounded-md gap-x-1 mt-2 ml-4">
             <Image source={icons.star} className="size-4" />
 
-            <Text className="text-white font-bold text-sm">
+            <Text className="text-text font-bold text-sm">
               {Math.round(movie?.vote_average ?? 0)}/10
             </Text>
 
-            <Text className="text-accent text-sm">
-              ({movie?.vote_count} votes)
-            </Text>
+            <Text className=" text-primary">({movie?.vote_count} votes)</Text>
+          </View>
+          <View className="flex-row items-center gap-x-2 mt-4 ml-4">
+            <MovieInfo label="Overview" value={movie?.overview} />
+            <MovieInfo
+              label="Genres"
+              value={movie?.genres?.map((g) => g.name).join(" • ") || "N/A"}
+            />
           </View>
 
-          <MovieInfo label="Overview" value={movie?.overview} />
-          <MovieInfo
-            label="Genres"
-            value={movie?.genres?.map((g) => g.name).join(" • ") || "N/A"}
-          />
-
-          <View className="flex flex-row justify-between w-1/2">
+          <View className="flex flex-row justify-between w-1/2 ml-4">
             <MovieInfo
               label="Budget"
               value={`$${(movie?.budget ?? 0) / 1_000_000} million`}
@@ -159,19 +161,20 @@ const MovieDetails = () => {
               )} million`}
             />
           </View>
-
-          <MovieInfo
-            label="Production Companies"
-            value={
-              movie?.production_companies?.map((c) => c.name).join(" • ") ||
-              "N/A"
-            }
-          />
-        </View>
+          <View className="flex-row items-center gap-x-2 mt-4 ml-4 pb-40">
+            <MovieInfo
+              label="Production Companies"
+              value={
+                movie?.production_companies?.map((c) => c.name).join(" • ") ||
+                "N/A"
+              }
+            />
+          </View>
+        </LinearGradient>
       </ScrollView>
 
       <TouchableOpacity
-        className="absolute bottom-5 left-0 right-0 mx-5 bg-accent rounded-lg py-3.5 flex flex-row items-center justify-center z-50"
+        className="absolute bottom-5 left-0 right-0 mx-5 bg-accentLight rounded-lg py-3.5 flex flex-row items-center justify-center z-50"
         onPress={router.back}
       >
         <Image

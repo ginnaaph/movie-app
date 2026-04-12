@@ -12,14 +12,13 @@ const profileStats = [
 const quickActions = [
   { title: "Account Details", subtitle: "Update your profile and preferences" },
   { title: "Notifications", subtitle: "Manage reminders and app alerts" },
-  { title: "Playback Settings", subtitle: "Control captions and video defaults" },
+  {
+    title: "Playback Settings",
+    subtitle: "Control captions and video defaults",
+  },
 ];
 
-const supportItems = [
-  "Privacy & Security",
-  "Help Center",
-  "About Movie App",
-];
+const supportItems = ["Privacy & Security", "Help Center", "About Movie App"];
 
 const Profiles = () => {
   return (
@@ -36,35 +35,37 @@ const Profiles = () => {
           style={styles.movieIcon}
         />
 
-        <View className="rounded-[28px] border border-white/10 bg-[#21313B]/95 px-5 py-6">
+        <View className="rounded-[28px]  bg-primary px-5 py-6">
           <View className="flex-row items-center justify-between">
             <View className="flex-1 pr-4">
-              <Text className="text-light-200 text-sm">Profile</Text>
-              <Text className="text-white text-2xl font-bold mt-2">
+              <Text className="text-text text-sm">Profile</Text>
+              <Text className="text-text text-3xl font-bold mt-2">
                 Gina Pham
               </Text>
-              <Text className="text-light-200 mt-2 leading-5">
+              <Text className="text-accent mt-2 leading-5">
                 Building a personal movie library with saved picks, search
                 trends, and watchlist ideas.
               </Text>
             </View>
 
-            <View className="size-20 rounded-full bg-accent/20 border border-accent/40 items-center justify-center">
+            <View className="size-20 rounded-full bg-slateGrey items-center justify-center">
               <Image
                 source={icons.profile}
-                className="size-10"
-                tintColor="#E77023"
+                className="size-8"
+                tintColor="#F8F8F8"
               />
             </View>
           </View>
 
-          <View className="flex-row mt-6 rounded-2xl bg-white/5 border border-white/10 py-4">
+          <View className="flex-row mt-6 rounded-2xl bg-slateGrey/80 border border-white/10 py-4">
             {profileStats.map((stat) => (
               <View key={stat.label} className="flex-1 items-center">
-                <Text className="text-white text-xl font-bold">
+                <Text className="text-white text-2xl font-bold">
                   {stat.value}
                 </Text>
-                <Text className="text-light-200 text-xs mt-1">{stat.label}</Text>
+                <Text className="text-secondary text-sm  font-bold mt-1">
+                  {stat.label}
+                </Text>
               </View>
             ))}
           </View>
@@ -83,14 +84,14 @@ const Profiles = () => {
                     <Text className="text-white text-base font-semibold">
                       {item.title}
                     </Text>
-                    <Text className="text-light-200 text-sm mt-1 leading-5">
+                    <Text className="text-accent text-sm mt-1 leading-5">
                       {item.subtitle}
                     </Text>
                   </View>
                   <Image
                     source={icons.arrow}
                     className="size-4"
-                    tintColor="#88A0B0"
+                    tintColor="#D47373"
                   />
                 </View>
               </View>
@@ -106,11 +107,11 @@ const Profiles = () => {
                 key={item}
                 className="flex-row items-center justify-between border-b border-white/10 pb-4 last:border-b-0 last:pb-0"
               >
-                <Text className="text-light-100 text-base">{item}</Text>
+                <Text className="text-accent text-base">{item}</Text>
                 <Image
                   source={icons.arrow}
                   className="size-4"
-                  tintColor="#EAFBFF"
+                  tintColor="#D47373"
                 />
               </View>
             ))}
