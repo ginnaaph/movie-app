@@ -4,6 +4,7 @@ import home from "@/assets/icon/home.png";
 import movie from "@/assets/icon/movie.png";
 import movies from "@/assets/icon/movies.png";
 import play from "@/assets/icon/play.png";
+import popcorn from "@/assets/icon/popcorn.png";
 import profile from "@/assets/icon/profile.png";
 import search from "@/assets/icon/search.png";
 import star from "@/assets/icon/star.png";
@@ -17,4 +18,5 @@ export const icons = {
   movie,
   arrow,
   play,
+  popcorn,
 };

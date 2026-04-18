@@ -91,3 +91,25 @@ interface SavedMovie {
   saved: boolean;
   vote_average?: number;
 }
+
+interface UserProfile {
+  $id: string;
+  name: string;
+  bio: string;
+  profile_image_url: string;
+}
+
+interface ProfileStats {
+  saved: number;
+  watched: number;
+}
+
+interface WatchedMovie {
+  $id: string;
+  movie_id: number;
+  title: string;
+  poster_url: string;
+  vote_average?: number;
+  release_date?: string;
+  watched_at: string;
+}
