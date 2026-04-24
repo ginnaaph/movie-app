@@ -2,9 +2,11 @@ import SaveButton from "@/components/SaveButton";
 import { icons } from "@/constants/icon";
 import { fetchMovieDetails } from "@/services/api";
 import {
-  getSavedMovie,
-  removeSavedMovie,
-  saveMovie,
+  addMovieToList,
+  getLists,
+  getMovieListStatus,
+  markMovieWatched,
+  removeMovieFromList,
 } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
@@ -39,26 +41,39 @@ const MovieDetails = () => {
   const { data: movie, loading } = useFetch(() =>
     fetchMovieDetails(id as string),
   );
-  const [saved, setSaved] = useState(false);
+  const [lists, setLists] = useState<MovieList[]>([]);
+  const [customListIds, setCustomListIds] = useState<string[]>([]);
+  const [watched, setWatched] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [watchLoading, setWatchLoading] = useState(false);
 
   useEffect(() => {
-    const loadSavedState = async () => {
+    const loadMovieState = async () => {
       if (!movie?.id) {
         return;
       }
 
       try {
-        setSaved(Boolean(await getSavedMovie(movie.id)));
+        const [availableLists, status] = await Promise.all([
+          getLists(),
+          getMovieListStatus(movie.id),
+        ]);
+
+        setLists(availableLists);
+        setCustomListIds(status.customListIds);
+        setWatched(status.watched);
       } catch (error) {
-        console.error("Error loading saved state:", error);
+        console.error("Error loading movie list state:", error);
       }
     };
 
-    loadSavedState();
+    loadMovieState();
   }, [movie?.id]);
 
-  const handleSavePress = async () => {
+  const customLists = lists.filter((list) => list.type === "custom");
+  const saved = customListIds.length > 0;
+
+  const handleCustomListPress = async (listId: string) => {
     if (!movie || saveLoading) {
       return;
     }
@@ -66,18 +81,35 @@ const MovieDetails = () => {
     try {
       setSaveLoading(true);
 
-      if (saved) {
-        await removeSavedMovie(movie.id);
-        setSaved(false);
+      if (customListIds.includes(listId)) {
+        await removeMovieFromList(listId, movie.id);
+        setCustomListIds((current) => current.filter((id) => id !== listId));
       } else {
-        await saveMovie(movie);
-        setSaved(true);
+        await addMovieToList(listId, movie);
+        setCustomListIds((current) => [...current, listId]);
       }
     } catch (error) {
-      console.error("Error updating saved movie:", error);
-      Alert.alert("Save failed", "The movie could not be updated right now.");
+      console.error("Error updating list item:", error);
+      Alert.alert("Save failed", "The list could not be updated right now.");
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleMarkWatched = async () => {
+    if (!movie || watchLoading) {
+      return;
+    }
+
+    try {
+      setWatchLoading(true);
+      await markMovieWatched(movie);
+      setWatched(true);
+    } catch (error) {
+      console.error("Error marking movie as watched:", error);
+      Alert.alert("Watch update failed", "The movie could not be marked as watched.");
+    } finally {
+      setWatchLoading(false);
     }
   };
 
@@ -118,7 +150,7 @@ const MovieDetails = () => {
             <Text className="text-text font-bold text-4xl flex-1 pt-5">
               {movie?.title}
             </Text>
-            <SaveButton onPress={handleSavePress} isSaved={saved} />
+            <SaveButton onPress={() => undefined} isSaved={saved} disabled />
           </View>
           <View className="flex-row items-center gap-x-1 mt-2 ml-4">
             <Text className="text-accentLight text-md">
@@ -128,9 +160,62 @@ const MovieDetails = () => {
           </View>
           <Text className="text-accent text-md mt-3 ml-4 italic">
             {saveLoading
-              ? "Updating saved movies..."
-              : saved || "Saved to your list"}
+              ? "Updating your lists..."
+              : saved
+                ? "Saved in your custom lists"
+                : "Not in any custom list yet"}
           </Text>
+
+          <View className="mt-5 ml-4 gap-y-3">
+            <Text className="text-text text-lg font-semibold">Actions</Text>
+            <TouchableOpacity
+              className={`rounded-2xl px-4 py-3 ${
+                watched ? "bg-secondary/30" : "bg-accentLight"
+              }`}
+              onPress={handleMarkWatched}
+              disabled={watched || watchLoading}
+            >
+              <Text className="text-white text-center font-semibold">
+                {watchLoading
+                  ? "Marking watched..."
+                  : watched
+                    ? "Already in Watched List"
+                    : "Mark Watched"}
+              </Text>
+            </TouchableOpacity>
+
+            <View className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+              <Text className="text-white text-base font-semibold">
+                Save To List
+              </Text>
+              {customLists.length > 0 ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {customLists.map((list) => {
+                    const active = customListIds.includes(list.$id);
+
+                    return (
+                      <TouchableOpacity
+                        key={list.$id}
+                        className={`rounded-full border px-4 py-2 ${
+                          active
+                            ? "border-accentLight bg-accentLight/20"
+                            : "border-white/10 bg-primary/40"
+                        }`}
+                        onPress={() => handleCustomListPress(list.$id)}
+                        disabled={saveLoading}
+                      >
+                        <Text className="text-white font-medium">{list.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text className="text-accent mt-3 leading-5">
+                  Create a custom list from the Saved tab to organize this movie.
+                </Text>
+              )}
+            </View>
+          </View>
 
           <View className="flex-row items-center bg-slateGrey w-1/3 px-2 py-1 rounded-md gap-x-1 mt-2 ml-4">
             <Image source={icons.star} className="size-4" />

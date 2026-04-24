@@ -69,7 +69,7 @@ interface TrendingCardProps {
 }
 
 interface SavedMovieCardProps {
-  movie: SavedMovie;
+  movie: ListItem;
   index: number;
 }
 
@@ -82,34 +82,63 @@ interface TrendingMovie {
   poster_url: string;
 }
 
-interface SavedMovie {
+interface ListItem {
   $id: string;
+  user_id: string;
+  list_id: string;
   movie_id: number;
   title: string;
   poster_url: string;
   release_date?: string;
-  saved: boolean;
   vote_average?: number;
+  added_at: string;
 }
 
 interface UserProfile {
   $id: string;
+  user_id: string;
   name: string;
   bio: string;
   profile_image_url: string;
 }
 
+type ProfileRange = "week" | "month" | "all";
+
+interface MovieList {
+  $id: string;
+  user_id: string;
+  name: string;
+  slug: string;
+  type: "system" | "custom";
+  is_default: boolean;
+}
+
+interface ChartBucket {
+  label: string;
+  value: number;
+}
+
 interface ProfileStats {
   saved: number;
   watched: number;
+  lists: number;
+  range: ProfileRange;
+  chart: ChartBucket[];
 }
 
-interface WatchedMovie {
+interface WatchHistoryEntry {
   $id: string;
+  user_id: string;
   movie_id: number;
   title: string;
   poster_url: string;
   vote_average?: number;
   release_date?: string;
   watched_at: string;
+}
+
+interface MovieListStatus {
+  watched: boolean;
+  watchedListId: string | null;
+  customListIds: string[];
 }
