@@ -54,7 +54,6 @@ const Search = () => {
           await updateSeachCount(searchQuery, results[0]);
         }
       } catch (error) {
-        console.error("Error searching movies:", error);
         setSearchError(error instanceof Error ? error.message : "Search failed");
       } finally {
         setSearchLoading(false);

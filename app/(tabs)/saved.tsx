@@ -49,8 +49,7 @@ const Saved = () => {
             )
             .map((list) => list.$id),
         );
-      } catch (loadError) {
-        console.error("Error loading library:", loadError);
+      } catch {
         setError("Failed to load your lists.");
       } finally {
         setLoading(false);
@@ -81,7 +80,6 @@ const Saved = () => {
       setExpandedListIds((current) => [...current, list.$id]);
       setNewListName("");
     } catch (createError) {
-      console.error("Error creating list:", createError);
       setError(
         createError instanceof Error ? createError.message : "List could not be created.",
       );

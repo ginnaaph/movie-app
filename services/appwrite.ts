@@ -39,8 +39,28 @@ const defaultUserProfile: UserProfile = {
   profile_image_url: "",
 };
 
+const defaultWatchedList: MovieList = {
+  $id: "default-watched-list",
+  user_id: LOCAL_USER_ID,
+  name: "Watched List",
+  slug: DEFAULT_WATCHED_LIST_SLUG,
+  type: "system",
+  is_default: false,
+};
+
 const toPosterUrl = (posterPath?: string | null) =>
   posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : "";
+
+const isPermissionError = (error: unknown) => {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("not authorized") ||
+    message.includes("permission") ||
+    message.includes("unauthorized")
+  );
+};
 
 const slugify = (value: string) =>
   value
@@ -190,22 +210,30 @@ const toListItemFromMetricRow = (row: TrendingMovie): ListItem => ({
 });
 
 const getSavedMetricsRows = async (): Promise<TrendingMovie[]> => {
-  const rows = await listRowsAll<TrendingMovie>({
-    tableId: SEARCH_METRICS_TABLE_ID,
-    queries: [Query.equal("saved", true), Query.orderDesc("$createdAt")],
-  });
+  try {
+    const rows = await listRowsAll<TrendingMovie>({
+      tableId: SEARCH_METRICS_TABLE_ID,
+      queries: [Query.equal("saved", true), Query.orderDesc("$createdAt")],
+    });
 
-  return rows;
+    return rows;
+  } catch {
+    return [];
+  }
 };
 
 const getMetricsRowByMovieId = async (movieId: number) => {
-  const result = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: SEARCH_METRICS_TABLE_ID,
-    queries: [Query.equal("movie_id", movieId), Query.limit(1)],
-  });
+  try {
+    const result = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId: SEARCH_METRICS_TABLE_ID,
+      queries: [Query.equal("movie_id", movieId), Query.limit(1)],
+    });
 
-  return result.rows.length > 0 ? result.rows[0] : null;
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch {
+    return null;
+  }
 };
 
 const getSystemLists = (): MovieList[] => [
@@ -220,34 +248,38 @@ const getSystemLists = (): MovieList[] => [
 ];
 
 const getDefaultWatchedList = async (): Promise<MovieList> => {
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: MOVIE_LISTS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", LOCAL_USER_ID),
-      Query.equal("slug", DEFAULT_WATCHED_LIST_SLUG),
-      Query.limit(1),
-    ],
-  });
+  try {
+    const existing = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId: MOVIE_LISTS_TABLE_ID,
+      queries: [
+        Query.equal("user_id", LOCAL_USER_ID),
+        Query.equal("slug", DEFAULT_WATCHED_LIST_SLUG),
+        Query.limit(1),
+      ],
+    });
 
-  if (existing.rows.length > 0) {
-    return existing.rows[0] as unknown as MovieList;
+    if (existing.rows.length > 0) {
+      return existing.rows[0] as unknown as MovieList;
+    }
+
+    const created = await tables.createRow({
+      databaseId: DATABASE_ID,
+      tableId: MOVIE_LISTS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        user_id: LOCAL_USER_ID,
+        name: "Watched List",
+        slug: DEFAULT_WATCHED_LIST_SLUG,
+        type: "system",
+        is_default: true,
+      },
+    });
+
+    return created as unknown as MovieList;
+  } catch {
+    return defaultWatchedList;
   }
-
-  const created = await tables.createRow({
-    databaseId: DATABASE_ID,
-    tableId: MOVIE_LISTS_TABLE_ID,
-    rowId: ID.unique(),
-    data: {
-      user_id: LOCAL_USER_ID,
-      name: "Watched List",
-      slug: DEFAULT_WATCHED_LIST_SLUG,
-      type: "system",
-      is_default: true,
-    },
-  });
-
-  return created as unknown as MovieList;
 };
 
 export const updateSeachCount = async (query: string, movie: Movie) => {
@@ -282,7 +314,9 @@ export const updateSeachCount = async (query: string, movie: Movie) => {
       });
     }
   } catch (error) {
-    console.error("Error updating search count:", error);
+    if (!isPermissionError(error)) {
+      console.warn("Error updating search count:", error);
+    }
     throw error;
   }
 };
@@ -296,7 +330,9 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
     });
     return result.rows as unknown as TrendingMovie[];
   } catch (error) {
-    console.error("Error fetching trending movies:", error);
+    if (!isPermissionError(error)) {
+      console.warn("Error fetching trending movies:", error);
+    }
     return undefined;
   }
 };
@@ -326,7 +362,9 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
 
     return created as unknown as UserProfile;
   } catch (error) {
-    console.error("Error fetching user profile:", error);
+    if (!isPermissionError(error)) {
+      console.warn("Error fetching user profile:", error);
+    }
     return defaultUserProfile;
   }
 };
@@ -375,8 +413,10 @@ export const getLists = async (): Promise<MovieList[]> => {
       return left.name.localeCompare(right.name);
     });
   } catch (error) {
-    console.error("Error fetching lists:", error);
-    return [];
+    if (!isPermissionError(error)) {
+      console.warn("Error fetching lists:", error);
+    }
+    return [...getSystemLists(), defaultWatchedList];
   }
 };
 
@@ -432,7 +472,22 @@ export const getListItems = async (listId: string): Promise<ListItem[]> => {
 
     return rows;
   } catch (error) {
-    console.error("Error fetching list items:", error);
+    if (!isPermissionError(error)) {
+      console.warn("Error fetching list items:", error);
+    }
+    return [];
+  }
+};
+
+const getListItemsByMovieId = async (movieId: number): Promise<ListItem[]> => {
+  try {
+    const rows = await listRowsAll<ListItem>({
+      tableId: LIST_ITEMS_TABLE_ID,
+      queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("movie_id", movieId)],
+    });
+
+    return rows;
+  } catch {
     return [];
   }
 };
@@ -500,23 +555,22 @@ export const removeMovieFromList = async (
 };
 
 export const getMovieListStatus = async (movieId: number): Promise<MovieListStatus> => {
-  const [lists, items, metricRow] = await Promise.all([
+  const [lists, itemsResult, metricRow] = await Promise.all([
     getLists(),
-    listRowsAll<ListItem>({
-      tableId: LIST_ITEMS_TABLE_ID,
-      queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("movie_id", movieId)],
-    }),
+    getListItemsByMovieId(movieId),
     getMetricsRowByMovieId(movieId),
   ]);
 
   const watchedList = lists.find((list) => list.slug === DEFAULT_WATCHED_LIST_SLUG);
-  const customListIds = items
+  const customListIds = itemsResult
     .filter((item) => item.list_id !== watchedList?.$id)
     .map((item) => item.list_id);
 
   return {
     saved: Boolean((metricRow as TrendingMovie | null)?.saved),
-    watched: watchedList ? items.some((item) => item.list_id === watchedList.$id) : false,
+    watched: watchedList
+      ? itemsResult.some((item) => item.list_id === watchedList.$id)
+      : false,
     watchedListId: watchedList?.$id ?? null,
     customListIds,
   };
@@ -618,7 +672,9 @@ export const getWatchHistory = async (
 
     return rows.filter((entry) => isWithinRange(entry.watched_at, range));
   } catch (error) {
-    console.error("Error fetching watch history:", error);
+    if (!isPermissionError(error)) {
+      console.warn("Error fetching watch history:", error);
+    }
     return [];
   }
 };

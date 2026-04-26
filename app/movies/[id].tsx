@@ -66,9 +66,7 @@ const MovieDetails = () => {
         setSaved(status.saved);
         setCustomListIds(status.customListIds);
         setWatched(status.watched);
-      } catch (error) {
-        console.error("Error loading movie list state:", error);
-      }
+      } catch {}
     };
 
     loadMovieState();
@@ -91,8 +89,7 @@ const MovieDetails = () => {
         await saveMovie(movie);
         setSaved(true);
       }
-    } catch (error) {
-      console.error("Error updating saved movie:", error);
+    } catch {
       Alert.alert("Save failed", "The movie could not be updated right now.");
     } finally {
       setSaveLoading(false);
@@ -114,8 +111,7 @@ const MovieDetails = () => {
         await addMovieToList(listId, movie);
         setCustomListIds((current) => [...current, listId]);
       }
-    } catch (error) {
-      console.error("Error updating list item:", error);
+    } catch {
       Alert.alert("Save failed", "The list could not be updated right now.");
     } finally {
       setSaveLoading(false);
@@ -131,8 +127,7 @@ const MovieDetails = () => {
       setWatchLoading(true);
       await markMovieWatched(movie);
       setWatched(true);
-    } catch (error) {
-      console.error("Error marking movie as watched:", error);
+    } catch {
       Alert.alert("Watch update failed", "The movie could not be marked as watched.");
     } finally {
       setWatchLoading(false);

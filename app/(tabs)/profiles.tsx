@@ -54,21 +54,10 @@ const Profiles = () => {
         const watchHistory =
           watchHistoryResult.status === "fulfilled" ? watchHistoryResult.value : [];
 
-        if (profileResult.status === "rejected") {
-          console.error("Error loading user profile:", profileResult.reason);
-        }
-        if (statsResult.status === "rejected") {
-          console.error("Error loading profile stats:", statsResult.reason);
-        }
-        if (watchHistoryResult.status === "rejected") {
-          console.error("Error loading watch history:", watchHistoryResult.reason);
-        }
-
         setProfile(profileRow);
         setStats(profileStats);
         setRecentWatched(watchHistory.slice(0, 5));
-      } catch (loadError) {
-        console.error("Unexpected error loading profile dashboard:", loadError);
+      } catch {
         setProfile(null);
         setStats({ saved: 0, watched: 0, lists: 0, range, chart: [] });
         setRecentWatched([]);
