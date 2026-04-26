@@ -1,6 +1,5 @@
 import SavedCard from "@/components/SavedMovieCard";
 import SearchBar from "@/components/SearchBar";
-import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
 import { createList, getListItems, getLists } from "@/services/appwrite";
 import { useIsFocused } from "@react-navigation/native";
@@ -44,9 +43,7 @@ const Saved = () => {
         setItemsByList(Object.fromEntries(listItems));
         setExpandedListIds(
           loadedLists
-            .filter(
-              (list) => list.slug === "saved-list" || list.slug === "watched-list",
-            )
+            .filter((list) => list.slug === "saved-list" || list.slug === "watched-list")
             .map((list) => list.$id),
         );
       } catch {
@@ -62,20 +59,20 @@ const Saved = () => {
   }, [isFocused]);
 
   const handleCreateList = async () => {
-    if (!newListName.trim() || creating) {
-      return;
-    }
+    if (!newListName.trim() || creating) return;
 
     try {
       setCreating(true);
       setError(null);
       const list = await createList(newListName);
 
-      setLists((current) => [...current, list].sort((left, right) => {
-        if (left.is_default !== right.is_default) return left.is_default ? -1 : 1;
-        if (left.type !== right.type) return left.type === "system" ? -1 : 1;
-        return left.name.localeCompare(right.name);
-      }));
+      setLists((current) =>
+        [...current, list].sort((left, right) => {
+          if (left.is_default !== right.is_default) return left.is_default ? -1 : 1;
+          if (left.type !== right.type) return left.type === "system" ? -1 : 1;
+          return left.name.localeCompare(right.name);
+        }),
+      );
       setItemsByList((current) => ({ ...current, [list.$id]: [] }));
       setExpandedListIds((current) => [...current, list.$id]);
       setNewListName("");
@@ -101,116 +98,101 @@ const Saved = () => {
     .reduce((count, [, items]) => count + items.length, 0);
 
   return (
-    <View className="bg-primary flex-1">
+    <View className="flex-1 bg-primary">
       <Image source={images.navybg} style={StyleSheet.absoluteFillObject} />
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ minHeight: "100%", paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 120, paddingTop: 66 }}
       >
-        <Image
-          source={icons.movie}
-          resizeMode="contain"
-          style={styles.movieIcon}
-        />
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#0000ff"
-            className="mt-10 self-center"
-          />
-        ) : error ? (
-          <Text className="text-white mt-10">Error: {error}</Text>
+          <ActivityIndicator size="large" color="#3AB0FF" className="mt-20 self-center" />
         ) : (
-          <View className="flex-1 mt-5">
-            <SearchBar
-              onPress={() => router.push("/search")}
-              placeholder="Find movies to add to your lists..."
-            />
-
-            <View className="mt-6 rounded-[28px] border border-white/10 bg-[#18232B]/90 px-5 py-5">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="text-xl text-white font-bold">Your Lists</Text>
-                  <Text className="text-accent mt-1">
-                    {lists.length} lists • {totalSaved} saved movies
+          <>
+            <View className="px-2">
+              <View className="flex-row items-start justify-between">
+                <View className="flex-1 pr-4">
+                  <Text className="text-3xl font-bold text-white">Saved</Text>
+                  <Text className="mt-2 text-sm leading-6 text-[#9FD6E3]">
+                    Build lists for what you want to watch next and keep your queue tidy.
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-x-2">
-                  <Image
-                    source={icons.saved}
-                    className="size-4"
-                    tintColor="#E77023"
-                  />
-                  <Text className="text-accentLight text-sm font-medium">
-                    Library
-                  </Text>
+
+                <View className="mt-1 items-end">
+                  <Text className="text-3xl font-bold text-white">{totalSaved}</Text>
+                  <Text className="mt-1 text-sm text-white/70">queued titles</Text>
                 </View>
               </View>
 
-              <View className="mt-5 gap-y-3">
-                <TextInput
-                  value={newListName}
-                  onChangeText={setNewListName}
-                  placeholder="Create a new custom list"
-                  placeholderTextColor="#88A0B0"
-                  className="rounded-2xl border border-white/10 bg-primary/60 px-4 py-3 text-white"
+              <View className="mt-5">
+                <SearchBar
+                  onPress={() => router.push("/search")}
+                  placeholder="Find more movies to save..."
                 />
-                <TouchableOpacity
-                  className="rounded-2xl bg-accentLight px-4 py-3"
-                  onPress={handleCreateList}
-                  disabled={creating}
-                >
-                  <Text className="text-center text-white font-semibold">
-                    {creating ? "Creating list..." : "Create List"}
-                  </Text>
-                </TouchableOpacity>
+              </View>
+
+              <View className="mt-6">
+                <Text className="text-sm font-semibold uppercase tracking-[1.5px] text-[#9FD6E3]">
+                  Create List
+                </Text>
+                <View className="mt-3 flex-row items-center gap-x-3">
+                  <TextInput
+                    value={newListName}
+                    onChangeText={setNewListName}
+                    placeholder="Weekend, Favorites, Rewatch..."
+                    placeholderTextColor="#88A0B0"
+                    className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
+                  />
+                  <TouchableOpacity
+                    className="rounded-2xl bg-accentLight px-4 py-3"
+                    onPress={handleCreateList}
+                    disabled={creating}
+                  >
+                    <Text className="font-semibold text-white">
+                      {creating ? "..." : "Add"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {error ? <Text className="mt-3 text-sm text-[#F28B82]">{error}</Text> : null}
               </View>
             </View>
 
-            <View className="mt-8 gap-y-4">
+            <View className="mt-8 gap-y-7">
               {lists.map((list) => {
                 const items = itemsByList[list.$id] ?? [];
                 const expanded = expandedListIds.includes(list.$id);
+                const label =
+                  list.slug === "watched-list"
+                    ? "Watched"
+                    : list.slug === "saved-list"
+                      ? "Default"
+                      : list.type === "custom"
+                        ? "Custom"
+                        : "";
 
                 return (
-                  <View
-                    key={list.$id}
-                    className="rounded-[28px] border border-white/10 bg-white/5 px-5 py-5"
-                  >
+                  <View key={list.$id}>
                     <TouchableOpacity
-                      className="flex-row items-center justify-between"
+                      className="flex-row items-end justify-between px-2"
                       onPress={() => toggleList(list.$id)}
                     >
                       <View className="flex-1 pr-4">
-                        <View className="flex-row items-center gap-x-2">
-                          <Text className="text-white text-lg font-bold">
-                            {list.name}
-                          </Text>
-                          {list.slug === "watched-list" ? (
-                            <View className="rounded-full bg-accentLight/20 px-2 py-1">
-                              <Text className="text-accentLight text-xs font-semibold">
-                                Watched
-                              </Text>
-                            </View>
-                          ) : list.slug === "saved-list" ? (
-                            <View className="rounded-full bg-white/10 px-2 py-1">
-                              <Text className="text-white text-xs font-semibold">
-                                Default
-                              </Text>
-                            </View>
+                        <View className="flex-row items-center gap-x-3">
+                          <Text className="text-2xl font-bold text-white">{list.name}</Text>
+                          {label ? (
+                            <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#9FD6E3]">
+                              {label}
+                            </Text>
                           ) : null}
                         </View>
-                        <Text className="text-accent mt-2">
+                        <Text className="mt-2 text-sm text-white/70">
                           {items.length} {items.length === 1 ? "movie" : "movies"}
                         </Text>
                       </View>
 
-                      <Image
-                        source={icons.arrow}
-                        className={`size-4 ${expanded ? "rotate-90" : ""}`}
-                        tintColor="#D47373"
-                      />
+                      <Text className="text-2xl font-semibold text-white/80">
+                        {expanded ? "−" : "+"}
+                      </Text>
                     </TouchableOpacity>
 
                     {expanded ? (
@@ -220,7 +202,7 @@ const Saved = () => {
                           showsHorizontalScrollIndicator={false}
                           className="mt-4"
                           data={items}
-                          contentContainerStyle={{ paddingRight: 20 }}
+                          contentContainerStyle={{ paddingLeft: 8, paddingRight: 20 }}
                           renderItem={({ item, index }) => (
                             <SavedCard movie={item} index={index} />
                           )}
@@ -228,12 +210,12 @@ const Saved = () => {
                           ItemSeparatorComponent={() => <View className="w-4" />}
                         />
                       ) : (
-                        <View className="mt-4 rounded-2xl border border-white/10 bg-primary/40 px-4 py-5">
+                        <View className="mt-4 px-2">
                           <Text className="text-white text-base font-semibold">
                             No movies here yet
                           </Text>
-                          <Text className="text-light-200 mt-2 leading-5">
-                            Add movies from the details screen to build this list.
+                          <Text className="mt-2 leading-6 text-white/70">
+                            Add movies from the details page to build this list.
                           </Text>
                         </View>
                       )
@@ -242,7 +224,7 @@ const Saved = () => {
                 );
               })}
             </View>
-          </View>
+          </>
         )}
       </ScrollView>
     </View>
@@ -250,13 +232,3 @@ const Saved = () => {
 };
 
 export default Saved;
-
-const styles = StyleSheet.create({
-  movieIcon: {
-    width: 48,
-    height: 40,
-    marginTop: 80,
-    marginBottom: 20,
-    alignSelf: "center",
-  },
-});

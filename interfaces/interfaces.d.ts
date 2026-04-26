@@ -61,6 +61,22 @@ interface MovieDetails {
   video: boolean;
   vote_average: number;
   vote_count: number;
+  credits?: {
+    cast: {
+      id: number;
+      name: string;
+      character: string;
+      profile_path: string | null;
+      order: number;
+    }[];
+    crew: {
+      id: number;
+      name: string;
+      job: string;
+      department: string;
+      profile_path: string | null;
+    }[];
+  };
 }
 
 interface TrendingCardProps {

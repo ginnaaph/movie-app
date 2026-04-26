@@ -27,7 +27,7 @@ export const fetchMovies = async ({ query }: { query: string }) => {
 export const fetchMovieDetails = async (
   movie_id: string,
 ): Promise<MovieDetails> => {
-  const endpoint = `${TMBD_config.baseURL}/movie/${movie_id}?api_key=${TMBD_config.API_KEY}`;
+  const endpoint = `${TMBD_config.baseURL}/movie/${movie_id}?api_key=${TMBD_config.API_KEY}&append_to_response=credits`;
   const response = await fetch(endpoint, {
     method: "GET",
     headers: TMBD_config.headers,

@@ -64,10 +64,10 @@ const _layout = () => {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Log",
+          title: "Home",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabsIcon focused={focused} icon={icons.profile} title="Log" />
+            <TabsIcon focused={focused} icon={icons.home} title="Home" />
           ),
         }}
       />

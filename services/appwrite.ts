@@ -48,8 +48,54 @@ const defaultWatchedList: MovieList = {
   is_default: false,
 };
 
+let localIdCounter = 0;
+const nextLocalId = (prefix: string) => `${prefix}-${Date.now()}-${localIdCounter++}`;
+let localProfile: UserProfile = { ...defaultUserProfile };
+let localCustomLists: MovieList[] = [];
+let localSavedMovies: TrendingMovie[] = [];
+let localListItems: ListItem[] = [];
+let localWatchHistory: WatchHistoryEntry[] = [];
+
 const toPosterUrl = (posterPath?: string | null) =>
   posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : "";
+
+const toSavedMetric = (movie: Movie | MovieDetails, saved: boolean): TrendingMovie => ({
+  $id: nextLocalId("saved"),
+  searchTerm: movie.title,
+  count: 0,
+  movie_id: movie.id,
+  title: movie.title,
+  poster_url: toPosterUrl(movie.poster_path),
+  saved,
+  release_date: movie.release_date,
+  vote_average: movie.vote_average,
+});
+
+const toLocalListItem = (
+  listId: string,
+  movie: Movie | MovieDetails,
+): ListItem => ({
+  $id: nextLocalId("list-item"),
+  user_id: LOCAL_USER_ID,
+  list_id: listId,
+  movie_id: movie.id,
+  title: movie.title,
+  poster_url: toPosterUrl(movie.poster_path),
+  release_date: movie.release_date,
+  vote_average: movie.vote_average,
+  added_at: new Date().toISOString(),
+});
+
+const toLocalWatchHistoryEntry = (movie: Movie | MovieDetails): WatchHistoryEntry => ({
+  $id: nextLocalId("watch"),
+  user_id: LOCAL_USER_ID,
+  movie_id: movie.id,
+  title: movie.title,
+  poster_url: toPosterUrl(movie.poster_path),
+  vote_average: movie.vote_average,
+  release_date: movie.release_date,
+  watched_at: new Date().toISOString(),
+});
 
 const isExpectedAppwriteFallbackError = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -219,9 +265,9 @@ const getSavedMetricsRows = async (): Promise<TrendingMovie[]> => {
       queries: [Query.equal("saved", true), Query.orderDesc("$createdAt")],
     });
 
-    return rows;
+    return [...rows, ...localSavedMovies.filter((movie) => movie.saved)];
   } catch {
-    return [];
+    return localSavedMovies.filter((movie) => movie.saved);
   }
 };
 
@@ -233,9 +279,13 @@ const getMetricsRowByMovieId = async (movieId: number) => {
       queries: [Query.equal("movie_id", movieId), Query.limit(1)],
     });
 
-    return result.rows.length > 0 ? result.rows[0] : null;
+    return (
+      result.rows.find(Boolean) ??
+      localSavedMovies.find((movie) => movie.movie_id === movieId) ??
+      null
+    );
   } catch {
-    return null;
+    return localSavedMovies.find((movie) => movie.movie_id === movieId) ?? null;
   }
 };
 
@@ -249,6 +299,15 @@ const getSystemLists = (): MovieList[] => [
     is_default: true,
   },
 ];
+
+const mergeLists = (lists: MovieList[]) => {
+  const seen = new Set<string>();
+  return lists.filter((list) => {
+    if (seen.has(list.$id)) return false;
+    seen.add(list.$id);
+    return true;
+  });
+};
 
 const getDefaultWatchedList = async (): Promise<MovieList> => {
   try {
@@ -350,7 +409,7 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
 
 export const getUserProfile = async (): Promise<UserProfile | null> => {
   if (!USER_PROFILE_TABLE_ID) {
-    return defaultUserProfile;
+    return localProfile;
   }
 
   try {
@@ -363,7 +422,7 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
 
       if (result.rows.length > 0) {
         return {
-          ...defaultUserProfile,
+          ...localProfile,
           ...(result.rows[0] as unknown as Partial<UserProfile>),
         };
       }
@@ -380,7 +439,7 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
 
       if (fallbackResult.rows.length > 0) {
         return {
-          ...defaultUserProfile,
+          ...localProfile,
           ...(fallbackResult.rows[0] as unknown as Partial<UserProfile>),
         };
       }
@@ -394,20 +453,26 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     });
 
     return {
-      ...defaultUserProfile,
+      ...localProfile,
       ...(created as unknown as Partial<UserProfile>),
     };
   } catch (error) {
     if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching user profile:", error);
     }
-    return defaultUserProfile;
+    return localProfile;
   }
 };
 
 export const upsertUserProfile = async (
   data: Partial<UserProfile>,
 ): Promise<UserProfile> => {
+  localProfile = { ...localProfile, ...data };
+
+  if (!USER_PROFILE_TABLE_ID) {
+    return localProfile;
+  }
+
   const existing = await getUserProfile();
 
   const row = await tables.upsertRow({
@@ -420,7 +485,7 @@ export const upsertUserProfile = async (
     },
   });
 
-  return row as unknown as UserProfile;
+  return { ...localProfile, ...(row as unknown as Partial<UserProfile>) };
 };
 
 export const getLists = async (): Promise<MovieList[]> => {
@@ -431,11 +496,12 @@ export const getLists = async (): Promise<MovieList[]> => {
       tableId: MOVIE_LISTS_TABLE_ID,
       queries: [Query.equal("user_id", LOCAL_USER_ID)],
     });
-    const merged = [
+    const merged = mergeLists([
       ...getSystemLists(),
       watchedList,
+      ...localCustomLists,
       ...rows.filter((list) => list.$id !== watchedList.$id),
-    ];
+    ]);
 
     return merged.sort((left, right) => {
       if (left.is_default !== right.is_default) {
@@ -452,7 +518,7 @@ export const getLists = async (): Promise<MovieList[]> => {
     if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching lists:", error);
     }
-    return [...getSystemLists(), defaultWatchedList];
+    return mergeLists([...getSystemLists(), defaultWatchedList, ...localCustomLists]);
   }
 };
 
@@ -464,30 +530,56 @@ export const createList = async (name: string): Promise<MovieList> => {
     throw new Error("List name is required.");
   }
 
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: MOVIE_LISTS_TABLE_ID,
-    queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("slug", slug), Query.limit(1)],
-  });
-
-  if (existing.rows.length > 0) {
+  const localExisting = localCustomLists.find((list) => list.slug === slug);
+  if (localExisting) {
     throw new Error("A list with that name already exists.");
   }
 
-  const row = await tables.createRow({
-    databaseId: DATABASE_ID,
-    tableId: MOVIE_LISTS_TABLE_ID,
-    rowId: ID.unique(),
-    data: {
+  try {
+    const existing = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId: MOVIE_LISTS_TABLE_ID,
+      queries: [
+        Query.equal("user_id", LOCAL_USER_ID),
+        Query.equal("slug", slug),
+        Query.limit(1),
+      ],
+    });
+
+    if (existing.rows.length > 0) {
+      throw new Error("A list with that name already exists.");
+    }
+
+    const row = await tables.createRow({
+      databaseId: DATABASE_ID,
+      tableId: MOVIE_LISTS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        user_id: LOCAL_USER_ID,
+        name: trimmedName,
+        slug,
+        type: "custom",
+        is_default: false,
+      },
+    });
+
+    return row as unknown as MovieList;
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
+
+    const list: MovieList = {
+      $id: nextLocalId("list"),
       user_id: LOCAL_USER_ID,
       name: trimmedName,
       slug,
       type: "custom",
       is_default: false,
-    },
-  });
-
-  return row as unknown as MovieList;
+    };
+    localCustomLists = [...localCustomLists, list];
+    return list;
+  }
 };
 
 export const getListItems = async (listId: string): Promise<ListItem[]> => {
@@ -506,12 +598,20 @@ export const getListItems = async (listId: string): Promise<ListItem[]> => {
       ],
     });
 
-    return rows;
+    return [
+      ...rows,
+      ...localListItems.filter((item) => item.list_id === listId),
+    ].sort((left, right) => right.added_at.localeCompare(left.added_at));
   } catch (error) {
     if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching list items:", error);
     }
-    return [];
+    if (listId === DEFAULT_SAVED_LIST_ID) {
+      return localSavedMovies.filter((movie) => movie.saved).map(toListItemFromMetricRow);
+    }
+    return localListItems
+      .filter((item) => item.list_id === listId)
+      .sort((left, right) => right.added_at.localeCompare(left.added_at));
   }
 };
 
@@ -522,9 +622,12 @@ const getListItemsByMovieId = async (movieId: number): Promise<ListItem[]> => {
       queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("movie_id", movieId)],
     });
 
-    return rows;
+    return [
+      ...rows,
+      ...localListItems.filter((item) => item.movie_id === movieId),
+    ];
   } catch {
-    return [];
+    return localListItems.filter((item) => item.movie_id === movieId);
   }
 };
 
@@ -532,62 +635,87 @@ export const addMovieToList = async (
   listId: string,
   movie: Movie | MovieDetails,
 ): Promise<ListItem> => {
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: LIST_ITEMS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", LOCAL_USER_ID),
-      Query.equal("list_id", listId),
-      Query.equal("movie_id", movie.id),
-      Query.limit(1),
-    ],
-  });
+  const localExisting = localListItems.find(
+    (item) => item.list_id === listId && item.movie_id === movie.id,
+  );
+  if (localExisting) return localExisting;
 
-  if (existing.rows.length > 0) {
-    return existing.rows[0] as unknown as ListItem;
+  try {
+    const existing = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId: LIST_ITEMS_TABLE_ID,
+      queries: [
+        Query.equal("user_id", LOCAL_USER_ID),
+        Query.equal("list_id", listId),
+        Query.equal("movie_id", movie.id),
+        Query.limit(1),
+      ],
+    });
+
+    if (existing.rows.length > 0) {
+      return existing.rows[0] as unknown as ListItem;
+    }
+
+    const created = await tables.createRow({
+      databaseId: DATABASE_ID,
+      tableId: LIST_ITEMS_TABLE_ID,
+      rowId: ID.unique(),
+      data: {
+        user_id: LOCAL_USER_ID,
+        list_id: listId,
+        movie_id: movie.id,
+        title: movie.title,
+        poster_url: toPosterUrl(movie.poster_path),
+        release_date: movie.release_date,
+        vote_average: movie.vote_average,
+        added_at: new Date().toISOString(),
+      },
+    });
+
+    return created as unknown as ListItem;
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
+
+    const item = toLocalListItem(listId, movie);
+    localListItems = [...localListItems, item];
+    return item;
   }
-
-  const created = await tables.createRow({
-    databaseId: DATABASE_ID,
-    tableId: LIST_ITEMS_TABLE_ID,
-    rowId: ID.unique(),
-    data: {
-      user_id: LOCAL_USER_ID,
-      list_id: listId,
-      movie_id: movie.id,
-      title: movie.title,
-      poster_url: toPosterUrl(movie.poster_path),
-      release_date: movie.release_date,
-      vote_average: movie.vote_average,
-      added_at: new Date().toISOString(),
-    },
-  });
-
-  return created as unknown as ListItem;
 };
 
 export const removeMovieFromList = async (
   listId: string,
   movieId: number,
 ): Promise<void> => {
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: LIST_ITEMS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", LOCAL_USER_ID),
-      Query.equal("list_id", listId),
-      Query.equal("movie_id", movieId),
-      Query.limit(1),
-    ],
-  });
+  localListItems = localListItems.filter(
+    (item) => !(item.list_id === listId && item.movie_id === movieId),
+  );
 
-  if (existing.rows.length === 0) return;
+  try {
+    const existing = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId: LIST_ITEMS_TABLE_ID,
+      queries: [
+        Query.equal("user_id", LOCAL_USER_ID),
+        Query.equal("list_id", listId),
+        Query.equal("movie_id", movieId),
+        Query.limit(1),
+      ],
+    });
 
-  await tables.deleteRow({
-    databaseId: DATABASE_ID,
-    tableId: LIST_ITEMS_TABLE_ID,
-    rowId: existing.rows[0].$id,
-  });
+    if (existing.rows.length === 0) return;
+
+    await tables.deleteRow({
+      databaseId: DATABASE_ID,
+      tableId: LIST_ITEMS_TABLE_ID,
+      rowId: existing.rows[0].$id,
+    });
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
+  }
 };
 
 export const getMovieListStatus = async (movieId: number): Promise<MovieListStatus> => {
@@ -615,83 +743,134 @@ export const getMovieListStatus = async (movieId: number): Promise<MovieListStat
 export const saveMovie = async (movie: MovieDetails): Promise<TrendingMovie> => {
   const existing = await getMetricsRowByMovieId(movie.id);
 
-  if (existing) {
-    const result = await tables.updateRow({
-      databaseId: DATABASE_ID,
-      tableId: SEARCH_METRICS_TABLE_ID,
-      rowId: existing.$id,
-      data: {
-        searchTerm:
-          (existing as unknown as { searchTerm?: string }).searchTerm || movie.title,
-        count: (existing as unknown as { count?: number }).count ?? 0,
-        movie_id: movie.id,
-        title: movie.title,
-        poster_url: toPosterUrl(movie.poster_path),
-        release_date: movie.release_date,
-        vote_average: movie.vote_average,
-        saved: true,
-      },
-    });
+  const upsertLocalSavedMovie = () => {
+    const current = localSavedMovies.find((item) => item.movie_id === movie.id);
+    if (current) {
+      current.saved = true;
+      current.title = movie.title;
+      current.poster_url = toPosterUrl(movie.poster_path);
+      current.release_date = movie.release_date;
+      current.vote_average = movie.vote_average;
+      return current;
+    }
 
-    return result as unknown as TrendingMovie;
+    const created = toSavedMetric(movie, true);
+    localSavedMovies = [...localSavedMovies, created];
+    return created;
+  };
+
+  try {
+    if (existing && SEARCH_METRICS_TABLE_ID) {
+      const result = await tables.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: SEARCH_METRICS_TABLE_ID,
+        rowId: existing.$id,
+        data: {
+          searchTerm:
+            (existing as unknown as { searchTerm?: string }).searchTerm || movie.title,
+          count: (existing as unknown as { count?: number }).count ?? 0,
+          movie_id: movie.id,
+          title: movie.title,
+          poster_url: toPosterUrl(movie.poster_path),
+          release_date: movie.release_date,
+          vote_average: movie.vote_average,
+          saved: true,
+        },
+      });
+
+      return result as unknown as TrendingMovie;
+    }
+
+    if (SEARCH_METRICS_TABLE_ID) {
+      const result = await tables.createRow({
+        databaseId: DATABASE_ID,
+        tableId: SEARCH_METRICS_TABLE_ID,
+        rowId: ID.unique(),
+        data: {
+          searchTerm: movie.title,
+          count: 0,
+          movie_id: movie.id,
+          title: movie.title,
+          poster_url: toPosterUrl(movie.poster_path),
+          release_date: movie.release_date,
+          vote_average: movie.vote_average,
+          saved: true,
+        },
+      });
+
+      return result as unknown as TrendingMovie;
+    }
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
   }
 
-  const result = await tables.createRow({
-    databaseId: DATABASE_ID,
-    tableId: SEARCH_METRICS_TABLE_ID,
-    rowId: ID.unique(),
-    data: {
-      searchTerm: movie.title,
-      count: 0,
-      movie_id: movie.id,
-      title: movie.title,
-      poster_url: toPosterUrl(movie.poster_path),
-      release_date: movie.release_date,
-      vote_average: movie.vote_average,
-      saved: true,
-    },
-  });
-
-  return result as unknown as TrendingMovie;
+  return upsertLocalSavedMovie();
 };
 
 export const removeSavedMovie = async (movieId: number): Promise<void> => {
+  localSavedMovies = localSavedMovies.map((movie) =>
+    movie.movie_id === movieId ? { ...movie, saved: false } : movie,
+  );
+
   const existing = await getMetricsRowByMovieId(movieId);
+  if (!existing || !SEARCH_METRICS_TABLE_ID) return;
 
-  if (!existing) return;
-
-  await tables.updateRow({
-    databaseId: DATABASE_ID,
-    tableId: SEARCH_METRICS_TABLE_ID,
-    rowId: existing.$id,
-    data: { saved: false },
-  });
+  try {
+    await tables.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: SEARCH_METRICS_TABLE_ID,
+      rowId: existing.$id,
+      data: { saved: false },
+    });
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
+  }
 };
 
 export const markMovieWatched = async (movie: Movie | MovieDetails): Promise<void> => {
   const watchedList = await getDefaultWatchedList();
+  const localExisting = localWatchHistory.find((entry) => entry.movie_id === movie.id);
+  if (!localExisting) {
+    localWatchHistory = [...localWatchHistory, toLocalWatchHistoryEntry(movie)];
+  }
 
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
-    tableId: WATCH_HISTORY_TABLE_ID,
-    queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("movie_id", movie.id), Query.limit(1)],
-  });
+  try {
+    if (WATCH_HISTORY_TABLE_ID) {
+      const existing = await tables.listRows({
+        databaseId: DATABASE_ID,
+        tableId: WATCH_HISTORY_TABLE_ID,
+        queries: [
+          Query.equal("user_id", LOCAL_USER_ID),
+          Query.equal("movie_id", movie.id),
+          Query.limit(1),
+        ],
+      });
 
-  if (existing.rows.length === 0) {
-    await tables.createRow({
-      databaseId: DATABASE_ID,
-      tableId: WATCH_HISTORY_TABLE_ID,
-      rowId: ID.unique(),
-      data: {
-        user_id: LOCAL_USER_ID,
-        movie_id: movie.id,
-        title: movie.title,
-        poster_url: toPosterUrl(movie.poster_path),
-        vote_average: movie.vote_average,
-        release_date: movie.release_date,
-        watched_at: new Date().toISOString(),
-      },
-    });
+      if (existing.rows.length === 0) {
+        await tables.createRow({
+          databaseId: DATABASE_ID,
+          tableId: WATCH_HISTORY_TABLE_ID,
+          rowId: ID.unique(),
+          data: {
+            user_id: LOCAL_USER_ID,
+            movie_id: movie.id,
+            title: movie.title,
+            poster_url: toPosterUrl(movie.poster_path),
+            vote_average: movie.vote_average,
+            release_date: movie.release_date,
+            watched_at: new Date().toISOString(),
+          },
+        });
+      }
+    }
+  } catch (error) {
+    if (!isExpectedAppwriteFallbackError(error)) {
+      throw error;
+    }
   }
 
   await addMovieToList(watchedList.$id, movie);
@@ -705,25 +884,42 @@ export const getWatchHistory = async (
       tableId: WATCH_HISTORY_TABLE_ID,
       queries: [Query.equal("user_id", LOCAL_USER_ID), Query.orderDesc("watched_at")],
     });
-
-    return rows.filter((entry) => isWithinRange(entry.watched_at, range));
+    const merged = [...rows, ...localWatchHistory].sort((left, right) =>
+      right.watched_at.localeCompare(left.watched_at),
+    );
+    const seen = new Set<number>();
+    return merged
+      .filter((entry) => {
+        if (seen.has(entry.movie_id)) return false;
+        seen.add(entry.movie_id);
+        return true;
+      })
+      .filter((entry) => isWithinRange(entry.watched_at, range));
   } catch (error) {
     if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching watch history:", error);
     }
-    return [];
+    return localWatchHistory.filter((entry) => isWithinRange(entry.watched_at, range));
   }
 };
 
 export const getProfileStats = async (
   range: ProfileRange = "all",
 ): Promise<ProfileStats> => {
-  const [lists, allItems, allWatchHistory, savedMetricsRows] = await Promise.all([
+  const [lists, allItemsResult, allWatchHistory, savedMetricsRows] = await Promise.all([
     getLists(),
-    listRowsAll<ListItem>({
-      tableId: LIST_ITEMS_TABLE_ID,
-      queries: [Query.equal("user_id", LOCAL_USER_ID)],
-    }),
+    (async () => {
+      try {
+        const remoteItems = await listRowsAll<ListItem>({
+          tableId: LIST_ITEMS_TABLE_ID,
+          queries: [Query.equal("user_id", LOCAL_USER_ID)],
+        });
+
+        return [...remoteItems, ...localListItems];
+      } catch {
+        return [...localListItems];
+      }
+    })(),
     getWatchHistory("all"),
     getSavedMetricsRows(),
   ]);
@@ -732,14 +928,12 @@ export const getProfileStats = async (
     isWithinRange(entry.watched_at, range),
   );
   const watchedList = lists.find((list) => list.slug === DEFAULT_WATCHED_LIST_SLUG);
-  const savedMovieIds = new Set(
-    [
-      ...savedMetricsRows.map((item) => item.movie_id),
-      ...allItems
+  const savedMovieIds = new Set([
+    ...savedMetricsRows.map((item) => item.movie_id),
+    ...allItemsResult
       .filter((item) => item.list_id !== watchedList?.$id)
       .map((item) => item.movie_id),
-    ],
-  );
+  ]);
 
   return {
     saved: savedMovieIds.size,
