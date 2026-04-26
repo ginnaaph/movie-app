@@ -38,18 +38,41 @@ const Profiles = () => {
         setLoading(true);
         setError(null);
 
-        const [profileRow, profileStats, watchHistory] = await Promise.all([
+        const [profileResult, statsResult, watchHistoryResult] =
+          await Promise.allSettled([
           getUserProfile(),
           getProfileStats(range),
           getWatchHistory("all"),
         ]);
 
+        const profileRow =
+          profileResult.status === "fulfilled" ? profileResult.value : null;
+        const profileStats =
+          statsResult.status === "fulfilled"
+            ? statsResult.value
+            : { saved: 0, watched: 0, lists: 0, range, chart: [] };
+        const watchHistory =
+          watchHistoryResult.status === "fulfilled" ? watchHistoryResult.value : [];
+
+        if (profileResult.status === "rejected") {
+          console.error("Error loading user profile:", profileResult.reason);
+        }
+        if (statsResult.status === "rejected") {
+          console.error("Error loading profile stats:", statsResult.reason);
+        }
+        if (watchHistoryResult.status === "rejected") {
+          console.error("Error loading watch history:", watchHistoryResult.reason);
+        }
+
         setProfile(profileRow);
         setStats(profileStats);
         setRecentWatched(watchHistory.slice(0, 5));
       } catch (loadError) {
-        console.error("Error loading profile dashboard:", loadError);
-        setError("Failed to load profile dashboard.");
+        console.error("Unexpected error loading profile dashboard:", loadError);
+        setProfile(null);
+        setStats({ saved: 0, watched: 0, lists: 0, range, chart: [] });
+        setRecentWatched([]);
+        setError("Failed to load some profile data.");
       } finally {
         setLoading(false);
       }
@@ -78,7 +101,11 @@ const Profiles = () => {
         />
 
         {loading ? (
-          <ActivityIndicator size="large" color="#0000ff" className="mt-10 self-center" />
+          <ActivityIndicator
+            size="large"
+            color="#0000ff"
+            className="mt-10 self-center"
+          />
         ) : error ? (
           <Text className="mt-10 text-white">{error}</Text>
         ) : (
@@ -197,14 +224,17 @@ const Profiles = () => {
                     No watched activity yet
                   </Text>
                   <Text className="mt-2 leading-5 text-light-200">
-                    Mark movies as watched from the details screen to populate this chart.
+                    Mark movies as watched from the details screen to populate
+                    this chart.
                   </Text>
                 </View>
               )}
             </View>
 
             <View className="mt-8 rounded-[28px] border border-white/10 bg-white/5 px-5 py-5">
-              <Text className="text-xl font-bold text-white">Recent Watched</Text>
+              <Text className="text-xl font-bold text-white">
+                Recent Watched
+              </Text>
 
               {recentWatched.length > 0 ? (
                 <View className="mt-4 gap-y-3">
@@ -215,17 +245,25 @@ const Profiles = () => {
                     >
                       <Image
                         source={{
-                          uri: item.poster_url || "https://placehold.co/600x400/1a1a1a.png",
+                          uri:
+                            item.poster_url ||
+                            "https://placehold.co/600x400/1a1a1a.png",
                         }}
                         className="h-16 w-12 rounded-lg"
                         resizeMode="cover"
                       />
                       <View className="ml-3 flex-1">
-                        <Text className="text-base font-semibold text-white" numberOfLines={1}>
+                        <Text
+                          className="text-base font-semibold text-white"
+                          numberOfLines={1}
+                        >
                           {item.title}
                         </Text>
                         <Text className="mt-1 text-sm text-accent">
-                          Watched on {new Date(item.watched_at).toLocaleDateString("en-US")}
+                          Watched on{" "}
+                          {new Date(item.watched_at).toLocaleDateString(
+                            "en-US",
+                          )}
                         </Text>
                       </View>
                     </View>
@@ -233,7 +271,9 @@ const Profiles = () => {
                 </View>
               ) : (
                 <View className="mt-4 rounded-2xl border border-white/10 bg-primary/40 px-4 py-5">
-                  <Text className="text-white">Your watched history will appear here.</Text>
+                  <Text className="text-white">
+                    Your watched history will appear here.
+                  </Text>
                 </View>
               )}
             </View>

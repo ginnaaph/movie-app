@@ -7,6 +7,8 @@ import {
   getMovieListStatus,
   markMovieWatched,
   removeMovieFromList,
+  removeSavedMovie,
+  saveMovie,
 } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
@@ -42,6 +44,7 @@ const MovieDetails = () => {
     fetchMovieDetails(id as string),
   );
   const [lists, setLists] = useState<MovieList[]>([]);
+  const [saved, setSaved] = useState(false);
   const [customListIds, setCustomListIds] = useState<string[]>([]);
   const [watched, setWatched] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -60,6 +63,7 @@ const MovieDetails = () => {
         ]);
 
         setLists(availableLists);
+        setSaved(status.saved);
         setCustomListIds(status.customListIds);
         setWatched(status.watched);
       } catch (error) {
@@ -71,7 +75,29 @@ const MovieDetails = () => {
   }, [movie?.id]);
 
   const customLists = lists.filter((list) => list.type === "custom");
-  const saved = customListIds.length > 0;
+
+  const handleDefaultSavePress = async () => {
+    if (!movie || saveLoading) {
+      return;
+    }
+
+    try {
+      setSaveLoading(true);
+
+      if (saved) {
+        await removeSavedMovie(movie.id);
+        setSaved(false);
+      } else {
+        await saveMovie(movie);
+        setSaved(true);
+      }
+    } catch (error) {
+      console.error("Error updating saved movie:", error);
+      Alert.alert("Save failed", "The movie could not be updated right now.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   const handleCustomListPress = async (listId: string) => {
     if (!movie || saveLoading) {
@@ -150,7 +176,7 @@ const MovieDetails = () => {
             <Text className="text-text font-bold text-4xl flex-1 pt-5">
               {movie?.title}
             </Text>
-            <SaveButton onPress={() => undefined} isSaved={saved} disabled />
+            <SaveButton onPress={handleDefaultSavePress} isSaved={saved} />
           </View>
           <View className="flex-row items-center gap-x-1 mt-2 ml-4">
             <Text className="text-accentLight text-md">
@@ -160,10 +186,10 @@ const MovieDetails = () => {
           </View>
           <Text className="text-accent text-md mt-3 ml-4 italic">
             {saveLoading
-              ? "Updating your lists..."
+              ? "Updating your saved movie..."
               : saved
-                ? "Saved in your custom lists"
-                : "Not in any custom list yet"}
+                ? "Saved to your default saved list"
+                : "Tap save to add this to your default saved list"}
           </Text>
 
           <View className="mt-5 ml-4 gap-y-3">

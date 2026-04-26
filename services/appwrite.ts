@@ -1,17 +1,28 @@
 import { Client, ID, Query, TablesDB } from "react-native-appwrite";
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_ID as string;
-const SEARCH_METRICS_TABLE_ID = process.env
-  .EXPO_PUBLIC_SEARCH_METRICS_TABLE_ID as string;
-const USER_PROFILE_TABLE_ID = process.env
-  .EXPO_PUBLIC_USER_PROFILE_TABLE_ID as string;
-const MOVIE_LISTS_TABLE_ID = process.env.EXPO_PUBLIC_MOVIE_LISTS_TABLE_ID as string;
-const LIST_ITEMS_TABLE_ID = process.env.EXPO_PUBLIC_LIST_ITEMS_TABLE_ID as string;
-const WATCH_HISTORY_TABLE_ID = process.env
-  .EXPO_PUBLIC_WATCH_HISTORY_TABLE_ID as string;
+const SEARCH_METRICS_TABLE_ID =
+  (process.env.EXPO_PUBLIC_SEARCH_METRICS_TABLE_ID ||
+    process.env.EXPO_PUBLIC_SEARCH_METRICS_COLLECTION_ID ||
+    process.env.EXPO_PUBLIC_COLLECTION_ID) as string;
+const USER_PROFILE_TABLE_ID =
+  (process.env.EXPO_PUBLIC_USER_PROFILE_TABLE_ID ||
+    process.env.EXPO_PUBLIC_USER_PROFILE_COLLECTION_ID) as string;
+const MOVIE_LISTS_TABLE_ID =
+  (process.env.EXPO_PUBLIC_MOVIE_LISTS_TABLE_ID ||
+    process.env.EXPO_PUBLIC_MOVIE_LISTS_COLLECTION_ID) as string;
+const LIST_ITEMS_TABLE_ID =
+  (process.env.EXPO_PUBLIC_LIST_ITEMS_TABLE_ID ||
+    process.env.EXPO_PUBLIC_LIST_ITEMS_COLLECTION_ID ||
+    process.env.EXPO_PUBLIC_LIST_ITEMS_COLLECTIONS_ID) as string;
+const WATCH_HISTORY_TABLE_ID =
+  (process.env.EXPO_PUBLIC_WATCH_HISTORY_TABLE_ID ||
+    process.env.EXPO_PUBLIC_WATCH_HISTORY_COLLECTION_ID) as string;
 
 const LOCAL_USER_ID = "local-user";
 const DEFAULT_PROFILE_ROW_ID = "local-user-profile";
+const DEFAULT_SAVED_LIST_ID = "default-saved-list";
+const DEFAULT_SAVED_LIST_SLUG = "saved-list";
 const DEFAULT_WATCHED_LIST_SLUG = "watched-list";
 
 const client = new Client()
@@ -19,6 +30,14 @@ const client = new Client()
   .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!);
 
 const tables = new TablesDB(client);
+
+const defaultUserProfile: UserProfile = {
+  $id: DEFAULT_PROFILE_ROW_ID,
+  user_id: LOCAL_USER_ID,
+  name: "Gina Pham",
+  bio: "Building a personal movie library with watched activity and custom lists.",
+  profile_image_url: "",
+};
 
 const toPosterUrl = (posterPath?: string | null) =>
   posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : "";
@@ -158,6 +177,48 @@ const listRowsAll = async <T>({
   return result.rows as unknown as T[];
 };
 
+const toListItemFromMetricRow = (row: TrendingMovie): ListItem => ({
+  $id: row.$id,
+  user_id: LOCAL_USER_ID,
+  list_id: DEFAULT_SAVED_LIST_ID,
+  movie_id: row.movie_id,
+  title: row.title,
+  poster_url: row.poster_url,
+  release_date: row.release_date,
+  vote_average: row.vote_average,
+  added_at: new Date().toISOString(),
+});
+
+const getSavedMetricsRows = async (): Promise<TrendingMovie[]> => {
+  const rows = await listRowsAll<TrendingMovie>({
+    tableId: SEARCH_METRICS_TABLE_ID,
+    queries: [Query.equal("saved", true), Query.orderDesc("$createdAt")],
+  });
+
+  return rows;
+};
+
+const getMetricsRowByMovieId = async (movieId: number) => {
+  const result = await tables.listRows({
+    databaseId: DATABASE_ID,
+    tableId: SEARCH_METRICS_TABLE_ID,
+    queries: [Query.equal("movie_id", movieId), Query.limit(1)],
+  });
+
+  return result.rows.length > 0 ? result.rows[0] : null;
+};
+
+const getSystemLists = (): MovieList[] => [
+  {
+    $id: DEFAULT_SAVED_LIST_ID,
+    user_id: LOCAL_USER_ID,
+    name: "Saved",
+    slug: DEFAULT_SAVED_LIST_SLUG,
+    type: "system",
+    is_default: true,
+  },
+];
+
 const getDefaultWatchedList = async (): Promise<MovieList> => {
   const existing = await tables.listRows({
     databaseId: DATABASE_ID,
@@ -216,6 +277,7 @@ export const updateSeachCount = async (query: string, movie: Movie) => {
           movie_id: movie.id,
           title: movie.title,
           poster_url: toPosterUrl(movie.poster_path),
+          saved: false,
         },
       });
     }
@@ -240,6 +302,10 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
 };
 
 export const getUserProfile = async (): Promise<UserProfile | null> => {
+  if (!USER_PROFILE_TABLE_ID) {
+    return defaultUserProfile;
+  }
+
   try {
     const result = await tables.listRows({
       databaseId: DATABASE_ID,
@@ -255,18 +321,13 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       databaseId: DATABASE_ID,
       tableId: USER_PROFILE_TABLE_ID,
       rowId: DEFAULT_PROFILE_ROW_ID,
-      data: {
-        user_id: LOCAL_USER_ID,
-        name: "Gina Pham",
-        bio: "Building a personal movie library with watched activity and custom lists.",
-        profile_image_url: "",
-      },
+      data: defaultUserProfile,
     });
 
     return created as unknown as UserProfile;
   } catch (error) {
     console.error("Error fetching user profile:", error);
-    return null;
+    return defaultUserProfile;
   }
 };
 
@@ -280,10 +341,7 @@ export const upsertUserProfile = async (
     tableId: USER_PROFILE_TABLE_ID,
     rowId: existing?.$id ?? DEFAULT_PROFILE_ROW_ID,
     data: {
-      user_id: LOCAL_USER_ID,
-      name: "Gina Pham",
-      bio: "",
-      profile_image_url: "",
+      ...defaultUserProfile,
       ...data,
     },
   });
@@ -293,14 +351,19 @@ export const upsertUserProfile = async (
 
 export const getLists = async (): Promise<MovieList[]> => {
   try {
-    await getDefaultWatchedList();
+    const watchedList = await getDefaultWatchedList();
 
     const rows = await listRowsAll<MovieList>({
       tableId: MOVIE_LISTS_TABLE_ID,
       queries: [Query.equal("user_id", LOCAL_USER_ID)],
     });
+    const merged = [
+      ...getSystemLists(),
+      watchedList,
+      ...rows.filter((list) => list.$id !== watchedList.$id),
+    ];
 
-    return rows.sort((left, right) => {
+    return merged.sort((left, right) => {
       if (left.is_default !== right.is_default) {
         return left.is_default ? -1 : 1;
       }
@@ -353,6 +416,11 @@ export const createList = async (name: string): Promise<MovieList> => {
 
 export const getListItems = async (listId: string): Promise<ListItem[]> => {
   try {
+    if (listId === DEFAULT_SAVED_LIST_ID) {
+      const rows = await getSavedMetricsRows();
+      return rows.map(toListItemFromMetricRow);
+    }
+
     const rows = await listRowsAll<ListItem>({
       tableId: LIST_ITEMS_TABLE_ID,
       queries: [
@@ -432,24 +500,82 @@ export const removeMovieFromList = async (
 };
 
 export const getMovieListStatus = async (movieId: number): Promise<MovieListStatus> => {
-  const [lists, items] = await Promise.all([
+  const [lists, items, metricRow] = await Promise.all([
     getLists(),
     listRowsAll<ListItem>({
       tableId: LIST_ITEMS_TABLE_ID,
       queries: [Query.equal("user_id", LOCAL_USER_ID), Query.equal("movie_id", movieId)],
     }),
+    getMetricsRowByMovieId(movieId),
   ]);
 
-  const watchedList = lists.find((list) => list.is_default);
+  const watchedList = lists.find((list) => list.slug === DEFAULT_WATCHED_LIST_SLUG);
   const customListIds = items
     .filter((item) => item.list_id !== watchedList?.$id)
     .map((item) => item.list_id);
 
   return {
+    saved: Boolean((metricRow as TrendingMovie | null)?.saved),
     watched: watchedList ? items.some((item) => item.list_id === watchedList.$id) : false,
     watchedListId: watchedList?.$id ?? null,
     customListIds,
   };
+};
+
+export const saveMovie = async (movie: MovieDetails): Promise<TrendingMovie> => {
+  const existing = await getMetricsRowByMovieId(movie.id);
+
+  if (existing) {
+    const result = await tables.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: SEARCH_METRICS_TABLE_ID,
+      rowId: existing.$id,
+      data: {
+        searchTerm:
+          (existing as unknown as { searchTerm?: string }).searchTerm || movie.title,
+        count: (existing as unknown as { count?: number }).count ?? 0,
+        movie_id: movie.id,
+        title: movie.title,
+        poster_url: toPosterUrl(movie.poster_path),
+        release_date: movie.release_date,
+        vote_average: movie.vote_average,
+        saved: true,
+      },
+    });
+
+    return result as unknown as TrendingMovie;
+  }
+
+  const result = await tables.createRow({
+    databaseId: DATABASE_ID,
+    tableId: SEARCH_METRICS_TABLE_ID,
+    rowId: ID.unique(),
+    data: {
+      searchTerm: movie.title,
+      count: 0,
+      movie_id: movie.id,
+      title: movie.title,
+      poster_url: toPosterUrl(movie.poster_path),
+      release_date: movie.release_date,
+      vote_average: movie.vote_average,
+      saved: true,
+    },
+  });
+
+  return result as unknown as TrendingMovie;
+};
+
+export const removeSavedMovie = async (movieId: number): Promise<void> => {
+  const existing = await getMetricsRowByMovieId(movieId);
+
+  if (!existing) return;
+
+  await tables.updateRow({
+    databaseId: DATABASE_ID,
+    tableId: SEARCH_METRICS_TABLE_ID,
+    rowId: existing.$id,
+    data: { saved: false },
+  });
 };
 
 export const markMovieWatched = async (movie: Movie | MovieDetails): Promise<void> => {
@@ -500,23 +626,27 @@ export const getWatchHistory = async (
 export const getProfileStats = async (
   range: ProfileRange = "all",
 ): Promise<ProfileStats> => {
-  const [lists, allItems, allWatchHistory] = await Promise.all([
+  const [lists, allItems, allWatchHistory, savedMetricsRows] = await Promise.all([
     getLists(),
     listRowsAll<ListItem>({
       tableId: LIST_ITEMS_TABLE_ID,
       queries: [Query.equal("user_id", LOCAL_USER_ID)],
     }),
     getWatchHistory("all"),
+    getSavedMetricsRows(),
   ]);
 
   const filteredWatchHistory = allWatchHistory.filter((entry) =>
     isWithinRange(entry.watched_at, range),
   );
-  const watchedList = lists.find((list) => list.is_default);
+  const watchedList = lists.find((list) => list.slug === DEFAULT_WATCHED_LIST_SLUG);
   const savedMovieIds = new Set(
-    allItems
+    [
+      ...savedMetricsRows.map((item) => item.movie_id),
+      ...allItems
       .filter((item) => item.list_id !== watchedList?.$id)
       .map((item) => item.movie_id),
+    ],
   );
 
   return {

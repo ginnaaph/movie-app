@@ -80,6 +80,9 @@ interface TrendingMovie {
   movie_id: number;
   title: string;
   poster_url: string;
+  saved?: boolean;
+  release_date?: string;
+  vote_average?: number;
 }
 
 interface ListItem {
@@ -138,6 +141,7 @@ interface WatchHistoryEntry {
 }
 
 interface MovieListStatus {
+  saved: boolean;
   watched: boolean;
   watchedListId: string | null;
   customListIds: string[];

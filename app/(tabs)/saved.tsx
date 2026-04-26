@@ -43,7 +43,11 @@ const Saved = () => {
         setLists(loadedLists);
         setItemsByList(Object.fromEntries(listItems));
         setExpandedListIds(
-          loadedLists.filter((list) => list.is_default).map((list) => list.$id),
+          loadedLists
+            .filter(
+              (list) => list.slug === "saved-list" || list.slug === "watched-list",
+            )
+            .map((list) => list.$id),
         );
       } catch (loadError) {
         console.error("Error loading library:", loadError);
@@ -95,7 +99,7 @@ const Saved = () => {
   };
 
   const totalSaved = Object.entries(itemsByList)
-    .filter(([listId]) => !lists.find((list) => list.$id === listId)?.is_default)
+    .filter(([listId]) => lists.find((list) => list.$id === listId)?.slug !== "watched-list")
     .reduce((count, [, items]) => count + items.length, 0);
 
   return (
@@ -185,10 +189,16 @@ const Saved = () => {
                           <Text className="text-white text-lg font-bold">
                             {list.name}
                           </Text>
-                          {list.is_default ? (
+                          {list.slug === "watched-list" ? (
                             <View className="rounded-full bg-accentLight/20 px-2 py-1">
                               <Text className="text-accentLight text-xs font-semibold">
                                 Watched
+                              </Text>
+                            </View>
+                          ) : list.slug === "saved-list" ? (
+                            <View className="rounded-full bg-white/10 px-2 py-1">
+                              <Text className="text-white text-xs font-semibold">
+                                Default
                               </Text>
                             </View>
                           ) : null}
