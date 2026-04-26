@@ -64,20 +64,20 @@ const _layout = () => {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Log",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabsIcon focused={focused} icon={icons.home} title="Home" />
+            <TabsIcon focused={focused} icon={icons.profile} title="Log" />
           ),
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
+          title: "Discover",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabsIcon focused={focused} icon={icons.search} title="Search" />
+            <TabsIcon focused={focused} icon={icons.search} title="Discover" />
           ),
         }}
       />
@@ -94,6 +94,7 @@ const _layout = () => {
       <Tabs.Screen
         name="profiles"
         options={{
+          href: null,
           title: "Profiles",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
