@@ -51,14 +51,17 @@ const defaultWatchedList: MovieList = {
 const toPosterUrl = (posterPath?: string | null) =>
   posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : "";
 
-const isPermissionError = (error: unknown) => {
+const isExpectedAppwriteFallbackError = (error: unknown) => {
   if (!(error instanceof Error)) return false;
 
   const message = error.message.toLowerCase();
   return (
     message.includes("not authorized") ||
     message.includes("permission") ||
-    message.includes("unauthorized")
+    message.includes("unauthorized") ||
+    message.includes("table with the requested id") ||
+    message.includes("attribute not found in schema") ||
+    message.includes("invalid query")
   );
 };
 
@@ -283,6 +286,10 @@ const getDefaultWatchedList = async (): Promise<MovieList> => {
 };
 
 export const updateSeachCount = async (query: string, movie: Movie) => {
+  if (!SEARCH_METRICS_TABLE_ID) {
+    return;
+  }
+
   try {
     const result = await tables.listRows({
       databaseId: DATABASE_ID,
@@ -314,7 +321,7 @@ export const updateSeachCount = async (query: string, movie: Movie) => {
       });
     }
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error updating search count:", error);
     }
     throw error;
@@ -322,6 +329,10 @@ export const updateSeachCount = async (query: string, movie: Movie) => {
 };
 
 export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> => {
+  if (!SEARCH_METRICS_TABLE_ID) {
+    return undefined;
+  }
+
   try {
     const result = await tables.listRows({
       databaseId: DATABASE_ID,
@@ -330,7 +341,7 @@ export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> 
     });
     return result.rows as unknown as TrendingMovie[];
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching trending movies:", error);
     }
     return undefined;
@@ -343,14 +354,36 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
   }
 
   try {
-    const result = await tables.listRows({
-      databaseId: DATABASE_ID,
-      tableId: USER_PROFILE_TABLE_ID,
-      queries: [Query.equal("user_id", LOCAL_USER_ID), Query.limit(1)],
-    });
+    try {
+      const result = await tables.listRows({
+        databaseId: DATABASE_ID,
+        tableId: USER_PROFILE_TABLE_ID,
+        queries: [Query.equal("user_id", LOCAL_USER_ID), Query.limit(1)],
+      });
 
-    if (result.rows.length > 0) {
-      return result.rows[0] as unknown as UserProfile;
+      if (result.rows.length > 0) {
+        return {
+          ...defaultUserProfile,
+          ...(result.rows[0] as unknown as Partial<UserProfile>),
+        };
+      }
+    } catch (error) {
+      if (!isExpectedAppwriteFallbackError(error)) {
+        throw error;
+      }
+
+      const fallbackResult = await tables.listRows({
+        databaseId: DATABASE_ID,
+        tableId: USER_PROFILE_TABLE_ID,
+        queries: [Query.limit(1)],
+      });
+
+      if (fallbackResult.rows.length > 0) {
+        return {
+          ...defaultUserProfile,
+          ...(fallbackResult.rows[0] as unknown as Partial<UserProfile>),
+        };
+      }
     }
 
     const created = await tables.createRow({
@@ -360,9 +393,12 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       data: defaultUserProfile,
     });
 
-    return created as unknown as UserProfile;
+    return {
+      ...defaultUserProfile,
+      ...(created as unknown as Partial<UserProfile>),
+    };
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching user profile:", error);
     }
     return defaultUserProfile;
@@ -413,7 +449,7 @@ export const getLists = async (): Promise<MovieList[]> => {
       return left.name.localeCompare(right.name);
     });
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching lists:", error);
     }
     return [...getSystemLists(), defaultWatchedList];
@@ -472,7 +508,7 @@ export const getListItems = async (listId: string): Promise<ListItem[]> => {
 
     return rows;
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching list items:", error);
     }
     return [];
@@ -672,7 +708,7 @@ export const getWatchHistory = async (
 
     return rows.filter((entry) => isWithinRange(entry.watched_at, range));
   } catch (error) {
-    if (!isPermissionError(error)) {
+    if (!isExpectedAppwriteFallbackError(error)) {
       console.warn("Error fetching watch history:", error);
     }
     return [];
