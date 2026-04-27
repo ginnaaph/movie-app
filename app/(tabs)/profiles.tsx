@@ -1,3 +1,4 @@
+import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { images } from "@/constants/images";
 import { fetchMovieDetails } from "@/services/api";
 import {
@@ -232,8 +233,12 @@ const Profiles = () => {
           <ActivityIndicator size="large" color="#E77023" className="mt-20 self-center" />
         ) : (
           <>
+            <View className="items-center px-2">
+              <FrameLogWordmark scale={1.8} />
+            </View>
+
             <View className="px-2">
-              <View className="flex-row items-center justify-between">
+              <View className="mt-5 flex-row items-center justify-between">
                 <View className="flex-row items-center flex-1 pr-3">
                   <View className="size-16 items-center justify-center rounded-full border-2 border-accentLight bg-accentLight/10">
                     <Text className="text-2xl font-bold text-accentLight">
@@ -242,7 +247,7 @@ const Profiles = () => {
                   </View>
                   <View className="ml-3 flex-1">
                     <Text className="text-2xl font-bold text-white" numberOfLines={1}>
-                      {profile?.name || "Movie Tracker"}
+                      {profile?.name || "FrameLog"}
                     </Text>
                     <Text className="mt-1 text-sm leading-6 text-[#9FD6E3]" numberOfLines={2}>
                       {profile?.bio || "Building a personal media log."}

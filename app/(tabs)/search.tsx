@@ -1,7 +1,7 @@
 import { MovieCard } from "@/components/MovieCard";
+import FrameLogWordmark from "@/components/FrameLogWordmark";
 import SearchBar from "@/components/SearchBar";
 import TrendingCard from "@/components/TrendingCard";
-import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
 import { fetchMovies } from "@/services/api";
 import { getTrendingMovies, updateSeachCount } from "@/services/appwrite";
@@ -85,8 +85,8 @@ const Search = () => {
         className="px-5"
         ListHeaderComponent={
           <>
-            <View className="w-full flex-row items-center justify-center mt-20">
-              <Image source={icons.movie} style={styles.movieIcon} />
+            <View className="mt-20 w-full flex-row items-center justify-center">
+              <FrameLogWordmark scale={1.6} />
             </View>
             <View className="my-5">
               <SearchBar
@@ -176,10 +176,3 @@ const Search = () => {
 };
 
 export default Search;
-
-const styles = StyleSheet.create({
-  movieIcon: {
-    width: 48,
-    height: 40,
-  },
-});

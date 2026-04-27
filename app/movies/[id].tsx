@@ -1,3 +1,4 @@
+import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { icons } from "@/constants/icon";
 import { fetchMovieDetails } from "@/services/api";
 import {
@@ -237,6 +238,8 @@ const MovieDetails = () => {
               >
                 <Text className="text-3xl font-semibold text-white">‹</Text>
               </TouchableOpacity>
+
+              <FrameLogWordmark scale={1.15} />
 
               <TouchableOpacity
                 className="size-11 items-center justify-center rounded-full border border-white/15 bg-[#111A28]/70"

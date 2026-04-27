@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 273.33 82.5">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #0f1120;
+        stroke-width: 2.5px;
+      }
+
+      .cls-1, .cls-2, .cls-3 {
+        stroke: #20265c;
+      }
+
+      .cls-2, .cls-4, .cls-3 {
+        fill: #4d7ef7;
+      }
+
+      .cls-5 {
+        fill: none;
+        stroke: #4d7ef7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 3px;
+      }
+
+      .cls-4 {
+        font-family: HelveticaNeue-Bold, 'Helvetica Neue';
+        font-weight: 700;
+        letter-spacing: -.03em;
+      }
+
+      .cls-4, .cls-3, .cls-6 {
+        isolation: isolate;
+      }
+
+      .cls-4, .cls-6 {
+        font-size: 44px;
+      }
+
+      .cls-3 {
+        opacity: .5;
+      }
+
+      .cls-6 {
+        fill: #d47373;
+        font-family: HelveticaNeue-Light, 'Helvetica Neue';
+        font-weight: 300;
+        letter-spacing: -.03em;
+      }
+
+      .cls-7 {
+        fill: url(#linear-gradient);
+        stroke: rgba(32, 38, 92, .3);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="-109.03" y1="287.7" x2="-108.03" y2="288.7" gradientTransform="translate(4382.25 16180.25) scale(40 -56)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4d7ef7" stop-opacity="0"/>
+      <stop offset="1" stop-color="#4d7ef7" stop-opacity=".35"/>
+    </linearGradient>
+  </defs>
+  <rect class="cls-1" x="1.25" y="1.25" width="80" height="80" rx="18" ry="18"/>
+  <rect class="cls-3" x="6.25" y="14.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="6.25" y="29.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="6.25" y="44.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="6.25" y="59.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="68.25" y="14.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="68.25" y="29.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="68.25" y="44.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-3" x="68.25" y="59.25" width="8" height="7" rx="2" ry="2"/>
+  <rect class="cls-7" x="21.25" y="13.25" width="40" height="56" rx="5" ry="5"/>
+  <polyline class="cls-5" points="26.25 53.25 33.25 43.25 40.25 48.25 48.25 34.25 58.25 29.25"/>
+  <circle class="cls-2" cx="58.25" cy="29.25" r="4"/>
+  <text class="cls-4" transform="translate(97.25 57.25)"><tspan x="0" y="0">frame</tspan></text>
+  <text class="cls-6" transform="translate(219.25 57.25)"><tspan x="0" y="0">log</tspan></text>
+</svg>

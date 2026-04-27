@@ -1,3 +1,4 @@
+import FrameLogWordmark from "@/components/FrameLogWordmark";
 import SavedCard from "@/components/SavedMovieCard";
 import SearchBar from "@/components/SearchBar";
 import { images } from "@/constants/images";
@@ -109,8 +110,12 @@ const Saved = () => {
           <ActivityIndicator size="large" color="#3AB0FF" className="mt-20 self-center" />
         ) : (
           <>
+            <View className="items-center px-2">
+              <FrameLogWordmark scale={1.8} />
+            </View>
+
             <View className="px-2">
-              <View className="flex-row items-start justify-between">
+              <View className="mt-5 flex-row items-start justify-between">
                 <View className="flex-1 pr-4">
                   <Text className="text-3xl font-bold text-white">Saved</Text>
                   <Text className="mt-2 text-sm leading-6 text-[#9FD6E3]">
