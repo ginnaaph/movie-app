@@ -227,40 +227,22 @@ const MovieDetails = () => {
             resizeMode="cover"
           />
 
+          {/* Top vignette — keeps nav bar readable against bright backdrops */}
           <LinearGradient
-            colors={[
-              "rgba(8,11,20,0.00)",
-              "rgba(8,11,20,0.04)",
-              "rgba(8,11,20,0.14)",
-              "rgba(10,14,22,0.32)",
-              "rgba(10,14,22,0.58)",
-            ]}
-            locations={[0, 0.18, 0.38, 0.62, 1]}
-            className="absolute inset-0"
+            colors={["rgba(0,0,0,0.55)", "transparent"]}
+            className="absolute left-0 right-0 top-0 h-52"
           />
 
-          <View className="absolute bottom-0 left-0 right-0 h-[430px]">
-            <LinearGradient
-              colors={[
-                "rgba(12,20,32,0)",
-                "rgba(12,20,32,0.65)",
-                "#0C1420",
-                "#0C1420",
-              ]}
-              locations={[0, 0.18, 0.48, 1]}
-              className="h-full w-full"
-            />
-          </View>
-
+          {/* Cinematic bottom fade — single smooth sweep to background */}
           <LinearGradient
             colors={[
-              "rgba(12,20,32,0)",
-              "rgba(12,20,32,0.74)",
-              "#0C1420",
+              "transparent",
+              "rgba(12,20,32,0.15)",
+              "rgba(12,20,32,0.72)",
               "#0C1420",
             ]}
-            locations={[0, 0.12, 0.34, 1]}
-            className="absolute bottom-0 left-0 right-0 h-[360px]"
+            locations={[0, 0.38, 0.65, 1]}
+            className="absolute inset-0"
           />
 
           <SafeAreaView className="absolute left-0 right-0 top-0 px-5 pt-2">
@@ -299,23 +281,29 @@ const MovieDetails = () => {
               {movie.title}
             </Text>
 
-            <View className="-mx-5 bg-[#0C1420]/60 px-5 pb-8 pt-4">
+            <View className="-mx-5 px-5 pb-8 pt-4">
               {movie.tagline ? (
                 <Text
                   className="text-sm italic text-[#D7F2F8]"
                   numberOfLines={2}
                   style={{
-                    textShadowColor: "rgba(0,0,0,0.55)",
+                    textShadowColor: "rgba(0,0,0,0.7)",
                     textShadowOffset: { width: 0, height: 1 },
-                    textShadowRadius: 6,
+                    textShadowRadius: 8,
                   }}
                 >
                   {movie.tagline}
                 </Text>
               ) : null}
 
-              <View className="mt-3 flex-row flex-wrap gap-2">
-                {metadataPill(`${Math.round(movie.vote_average)}/10`)}
+              <View className="mt-3 flex-row flex-wrap items-center gap-2">
+                <View className="flex-row items-center rounded-full bg-amber-500/20 px-3 py-2">
+                  <Text className="mr-1 text-sm text-amber-400">★</Text>
+                  <Text className="text-sm font-bold text-amber-300">
+                    {movie.vote_average.toFixed(1)}
+                  </Text>
+                  <Text className="ml-0.5 text-xs text-white/50">/10</Text>
+                </View>
                 {metadata.map((item) => metadataPill(item))}
               </View>
 
