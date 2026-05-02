@@ -239,7 +239,7 @@ const Profiles = () => {
 
             <View className="px-2">
               <View className="mt-5 flex-row items-center justify-between">
-                <View className="flex-row items-center flex-1 pr-3">
+                <View className="flex-row items-center flex-1">
                   <View className="size-16 items-center justify-center rounded-full border-2 border-accentLight bg-accentLight/10">
                     <Text className="text-2xl font-bold text-accentLight">
                       {getInitial(profile?.name)}
@@ -249,22 +249,15 @@ const Profiles = () => {
                     <Text className="text-2xl font-bold text-white" numberOfLines={1}>
                       {profile?.name || "FrameLog"}
                     </Text>
-                    <Text className="mt-1 text-sm leading-6 text-[#9FD6E3]" numberOfLines={2}>
-                      {profile?.bio || "Building a personal media log."}
-                    </Text>
                   </View>
                 </View>
-
-                <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-accentLight">
-                  Home
-                </Text>
               </View>
 
               <View className="mt-6 flex-row items-center justify-between px-2">
                 {[
                   { label: "Films", value: String(allWatchHistory.length) },
                   { label: "Hours", value: formatHours(allWatchMinutes) },
-                  { label: "Lists", value: String(stats.lists) },
+                  { label: "Lists", value: String(customLists.length) },
                 ].map((item) => (
                   <View key={item.label} className="items-center">
                     <Text

@@ -2,8 +2,11 @@ import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { icons } from "@/constants/icon";
 import { fetchMovieDetails } from "@/services/api";
 import {
+  addMovieToList,
+  getLists,
   getMovieListStatus,
   markMovieWatched,
+  removeMovieFromList,
   removeSavedMovie,
   saveMovie,
 } from "@/services/appwrite";
@@ -14,7 +17,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -100,15 +105,24 @@ const MovieDetails = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
   const [expandedOverview, setExpandedOverview] = useState(false);
+  const [customLists, setCustomLists] = useState<MovieList[]>([]);
+  const [movieCustomListIds, setMovieCustomListIds] = useState<string[]>([]);
+  const [showListPicker, setShowListPicker] = useState(false);
+  const [listPickerLoading, setListPickerLoading] = useState(false);
 
   useEffect(() => {
     const loadMovieState = async () => {
       if (!movie?.id) return;
 
       try {
-        const status = await getMovieListStatus(movie.id);
+        const [status, allLists] = await Promise.all([
+          getMovieListStatus(movie.id),
+          getLists(),
+        ]);
         setSaved(status.saved);
         setWatched(status.watched);
+        setMovieCustomListIds(status.customListIds);
+        setCustomLists(allLists.filter((list) => list.type === "custom"));
       } catch {}
     };
 
@@ -169,6 +183,25 @@ const MovieDetails = () => {
       );
     } finally {
       setWatchLoading(false);
+    }
+  };
+
+  const handleToggleCustomList = async (list: MovieList) => {
+    if (!movie || listPickerLoading) return;
+    const isInList = movieCustomListIds.includes(list.$id);
+    try {
+      setListPickerLoading(true);
+      if (isInList) {
+        await removeMovieFromList(list.$id, movie.id);
+        setMovieCustomListIds((current) => current.filter((id) => id !== list.$id));
+      } else {
+        await addMovieToList(list.$id, movie);
+        setMovieCustomListIds((current) => [...current, list.$id]);
+      }
+    } catch {
+      Alert.alert("List update failed", "The list could not be updated right now.");
+    } finally {
+      setListPickerLoading(false);
     }
   };
 
@@ -328,21 +361,21 @@ const MovieDetails = () => {
                 >
                   <ActionIconLabel
                     icon="✓"
-                    label={
-                      watchLoading
-                        ? "Updating..."
-                        : watched
-                          ? "Watched"
-                          : "Watched"
-                    }
+                    label={watchLoading ? "Updating..." : "Watched"}
                   />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="w-14 items-center justify-center rounded-2xl bg-[#1A2740]/90 py-3.5"
+                  onPress={() => setShowListPicker(true)}
+                >
+                  <Text className="text-lg font-semibold text-white">☰</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
 
-        <View className=" bg-[#0C1420] px-5 pt-8">
+        <View className="bg-[#0C1420] px-5 pt-8">
           <Text
             className="text-base leading-8 text-white"
             numberOfLines={expandedOverview ? undefined : 4}
@@ -436,6 +469,56 @@ const MovieDetails = () => {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showListPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowListPicker(false)}
+      >
+        <TouchableOpacity
+          className="flex-1 bg-black/60"
+          activeOpacity={1}
+          onPress={() => setShowListPicker(false)}
+        />
+        <View className="rounded-t-3xl border-t border-white/10 bg-[#0C1420] px-5 pb-12 pt-5">
+          <View className="mb-5 flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-white">Add to List</Text>
+            <TouchableOpacity onPress={() => setShowListPicker(false)}>
+              <Text className="text-sm font-semibold text-accentLight">Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          {customLists.length === 0 ? (
+            <Text className="py-6 text-center text-sm text-white/60">
+              No custom lists yet. Create one from the Saved tab.
+            </Text>
+          ) : (
+            <FlatList
+              data={customLists}
+              keyExtractor={(item) => item.$id}
+              scrollEnabled={false}
+              renderItem={({ item }) => {
+                const isInList = movieCustomListIds.includes(item.$id);
+                return (
+                  <TouchableOpacity
+                    className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-4"
+                    onPress={() => handleToggleCustomList(item)}
+                    disabled={listPickerLoading}
+                  >
+                    <Text className="text-base font-semibold text-white">{item.name}</Text>
+                    {isInList ? (
+                      <Text className="text-lg text-accentLight">✓</Text>
+                    ) : (
+                      <View className="size-5 rounded-full border border-white/30" />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };

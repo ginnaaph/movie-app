@@ -42,8 +42,9 @@ const _layout = () => {
           justifyContent: "center",
         },
         tabBarStyle: {
-          backgroundColor: "#263743",
-          borderColor: "#88A0B0",
+          backgroundColor: "rgba(8, 15, 28, 0.82)",
+          borderColor: "rgba(255, 255, 255, 0.12)",
+          borderWidth: 1,
           borderRadius: 40,
           marginHorizontal: 20,
           marginBottom: 36,
@@ -54,6 +55,11 @@ const _layout = () => {
           alignItems: "center",
           justifyContent: "center",
           paddingTop: 10,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.35,
+          shadowRadius: 20,
+          elevation: 12,
         },
         tabBarIconStyle: {
           width: 40,
