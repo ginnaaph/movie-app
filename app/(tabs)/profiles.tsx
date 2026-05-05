@@ -1,10 +1,9 @@
 import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { images } from "@/constants/images";
-import { fetchMovieDetails } from "@/services/api";
+import { fetchMovieDetails, fetchTvDetails } from "@/services/api";
 import {
   getListItems,
   getLists,
-  getProfileStats,
   getUserProfile,
   getWatchHistory,
 } from "@/services/appwrite";
@@ -31,14 +30,6 @@ const sections = [
   { label: "Watched", value: "watched" },
   { label: "Watchlist", value: "watchlist" },
 ] as const;
-
-const emptyStats: ProfileStats = {
-  saved: 0,
-  watched: 0,
-  lists: 0,
-  range: "week",
-  chart: [],
-};
 
 const getInitial = (name?: string) => (name?.trim()?.charAt(0) || "M").toUpperCase();
 
@@ -69,21 +60,35 @@ const filterHistoryByRange = (
 
 const getWatchMinutes = (
   history: WatchHistoryEntry[],
-  detailsById: Record<number, MovieDetails>,
+  movieDetailsById: Record<number, MovieDetails>,
+  tvDetailsById: Record<number, TVDetails>,
 ) =>
-  history.reduce(
-    (total, entry) => total + (detailsById[entry.movie_id]?.runtime ?? 0),
-    0,
-  );
+  history.reduce((total, entry) => {
+    const mediaType = entry.media_type ?? "movie";
+    const mediaId = entry.media_id ?? entry.movie_id;
+
+    if (mediaType === "tv") {
+      return total + (tvDetailsById[mediaId]?.episode_run_time?.[0] ?? 0);
+    }
+
+    return total + (movieDetailsById[mediaId]?.runtime ?? 0);
+  }, 0);
 
 const getGenreBreakdown = (
   history: WatchHistoryEntry[],
-  detailsById: Record<number, MovieDetails>,
+  movieDetailsById: Record<number, MovieDetails>,
+  tvDetailsById: Record<number, TVDetails>,
 ) => {
   const counts = new Map<string, number>();
 
   history.forEach((entry) => {
-    const genres = detailsById[entry.movie_id]?.genres ?? [];
+    const mediaType = entry.media_type ?? "movie";
+    const mediaId = entry.media_id ?? entry.movie_id;
+    const genres =
+      mediaType === "tv"
+        ? tvDetailsById[mediaId]?.genres ?? []
+        : movieDetailsById[mediaId]?.genres ?? [];
+
     genres.forEach((genre) => {
       counts.set(genre.name, (counts.get(genre.name) ?? 0) + 1);
     });
@@ -117,8 +122,11 @@ const genreTone: Record<string, string> = {
 const chartHorizontalPadding = 10;
 const chartHeight = 140;
 
-const getChartPoints = (chart: ChartBucket[], chartWidth: number) => {
-  const maxValue = Math.max(...chart.map((bucket) => bucket.value), 1);
+const getChartPoints = (
+  chart: ChartBucket[],
+  chartWidth: number,
+  maxValue = Math.max(...chart.map((bucket) => bucket.value), 1),
+) => {
   const usableHeight = chartHeight - 28;
   const usableWidth = Math.max(chartWidth - chartHorizontalPadding * 2, 0);
   const stepX =
@@ -138,6 +146,68 @@ const getChartPoints = (chart: ChartBucket[], chartWidth: number) => {
   });
 };
 
+const splitHistoryByMedia = (history: WatchHistoryEntry[]) => ({
+  movies: history.filter((entry) => (entry.media_type ?? "movie") === "movie"),
+  tv: history.filter((entry) => (entry.media_type ?? "movie") === "tv"),
+});
+
+const buildChartFromHistory = (
+  history: WatchHistoryEntry[],
+  range: ProfileRange,
+): ChartBucket[] => {
+  const now = new Date();
+
+  if (range === "week") {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(now);
+      date.setDate(now.getDate() - (6 - index));
+      date.setHours(0, 0, 0, 0);
+      const key = date.toISOString().slice(0, 10);
+
+      return {
+        label: date.toLocaleDateString("en-US", { weekday: "short" }),
+        value: history.filter((entry) => entry.watched_at.slice(0, 10) === key).length,
+      };
+    });
+  }
+
+  if (range === "month") {
+    return Array.from({ length: 4 }, (_, index) => {
+      const start = new Date(now);
+      start.setDate(now.getDate() - (27 - index * 7));
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+
+      return {
+        label: `W${index + 1}`,
+        value: history.filter((entry) => {
+          const watchedAt = new Date(entry.watched_at);
+          return watchedAt >= start && watchedAt <= end;
+        }).length,
+      };
+    });
+  }
+
+  const latest =
+    history.length > 0
+      ? new Date(Math.max(...history.map((entry) => new Date(entry.watched_at).getTime())))
+      : now;
+
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(latest.getFullYear(), latest.getMonth() - (5 - index), 1);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    return {
+      label: date.toLocaleDateString("en-US", { month: "short" }),
+      value: history.filter((entry) => {
+        const watchedAt = new Date(entry.watched_at);
+        return watchedAt.getFullYear() === year && watchedAt.getMonth() === month;
+      }).length,
+    };
+  });
+};
+
 const Profiles = () => {
   const isFocused = useIsFocused();
   const [range, setRange] = useState<ProfileRange>("week");
@@ -145,11 +215,11 @@ const Profiles = () => {
     "activity",
   );
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<ProfileStats>(emptyStats);
   const [allWatchHistory, setAllWatchHistory] = useState<WatchHistoryEntry[]>([]);
   const [watchDetailsById, setWatchDetailsById] = useState<
     Record<number, MovieDetails>
   >({});
+  const [tvDetailsById, setTvDetailsById] = useState<Record<number, TVDetails>>({});
   const [lists, setLists] = useState<MovieList[]>([]);
   const [itemsByList, setItemsByList] = useState<Record<string, ListItem[]>>({});
   const [chartWidth, setChartWidth] = useState(0);
@@ -160,25 +230,21 @@ const Profiles = () => {
       try {
         setLoading(true);
 
-        const [profileResult, statsResult, watchHistoryResult, listsResult] =
+        const [profileResult, watchHistoryResult, listsResult] =
           await Promise.allSettled([
             getUserProfile(),
-            getProfileStats(range),
             getWatchHistory("all"),
             getLists(),
           ]);
 
         const loadedProfile =
           profileResult.status === "fulfilled" ? profileResult.value : null;
-        const loadedStats =
-          statsResult.status === "fulfilled" ? statsResult.value : emptyStats;
         const loadedWatchHistory =
           watchHistoryResult.status === "fulfilled" ? watchHistoryResult.value : [];
         const loadedLists =
           listsResult.status === "fulfilled" ? listsResult.value : [];
 
         setProfile(loadedProfile);
-        setStats({ ...loadedStats, range });
         setAllWatchHistory(loadedWatchHistory);
         setLists(loadedLists);
 
@@ -187,20 +253,43 @@ const Profiles = () => {
         );
         setItemsByList(Object.fromEntries(listEntries));
 
-        const uniqueMovieIds = [...new Set(loadedWatchHistory.map((item) => item.movie_id))];
+        const movieIds = [
+          ...new Set(
+            loadedWatchHistory
+              .filter((item) => (item.media_type ?? "movie") === "movie")
+              .map((item) => item.media_id ?? item.movie_id),
+          ),
+        ];
+        const tvIds = [
+          ...new Set(
+            loadedWatchHistory
+              .filter((item) => (item.media_type ?? "movie") === "tv")
+              .map((item) => item.media_id ?? item.movie_id),
+          ),
+        ];
         const detailsResults = await Promise.allSettled(
-          uniqueMovieIds.map((movieId) => fetchMovieDetails(String(movieId))),
+          movieIds.map((movieId) => fetchMovieDetails(String(movieId))),
+        );
+        const tvDetailsResults = await Promise.allSettled(
+          tvIds.map((tvId) => fetchTvDetails(String(tvId))),
         );
 
         const nextDetails: Record<number, MovieDetails> = {};
+        const nextTvDetails: Record<number, TVDetails> = {};
 
         detailsResults.forEach((result) => {
           if (result.status === "fulfilled") {
             nextDetails[result.value.id] = result.value;
           }
         });
+        tvDetailsResults.forEach((result) => {
+          if (result.status === "fulfilled") {
+            nextTvDetails[result.value.id] = result.value;
+          }
+        });
 
         setWatchDetailsById(nextDetails);
+        setTvDetailsById(nextTvDetails);
       } finally {
         setLoading(false);
       }
@@ -211,12 +300,23 @@ const Profiles = () => {
     }
   }, [isFocused, range]);
 
-  const chart = stats.chart ?? [];
-  const chartPoints = getChartPoints(chart, chartWidth);
   const rangedHistory = filterHistoryByRange(allWatchHistory, range);
-  const allWatchMinutes = getWatchMinutes(allWatchHistory, watchDetailsById);
-  const rangeWatchMinutes = getWatchMinutes(rangedHistory, watchDetailsById);
-  const topGenres = getGenreBreakdown(rangedHistory, watchDetailsById);
+  const { movies: allMovieHistory, tv: allTvHistory } = splitHistoryByMedia(allWatchHistory);
+  const { movies: rangedMovieHistory, tv: rangedTvHistory } =
+    splitHistoryByMedia(rangedHistory);
+  const movieChart = buildChartFromHistory(rangedMovieHistory, range);
+  const tvChart = buildChartFromHistory(rangedTvHistory, range);
+  const axisChart = movieChart.length > 0 ? movieChart : tvChart;
+  const maxChartValue = Math.max(
+    ...movieChart.map((bucket) => bucket.value),
+    ...tvChart.map((bucket) => bucket.value),
+    1,
+  );
+  const movieChartPoints = getChartPoints(movieChart, chartWidth, maxChartValue);
+  const tvChartPoints = getChartPoints(tvChart, chartWidth, maxChartValue);
+  const allWatchMinutes = getWatchMinutes(allWatchHistory, watchDetailsById, tvDetailsById);
+  const rangeWatchMinutes = getWatchMinutes(rangedHistory, watchDetailsById, tvDetailsById);
+  const topGenres = getGenreBreakdown(rangedHistory, watchDetailsById, tvDetailsById);
   const savedList = lists.find((list) => list.slug === "saved-list");
   const savedItems = savedList ? itemsByList[savedList.$id] ?? [] : [];
   const customLists = lists.filter((list) => list.type === "custom");
@@ -255,9 +355,9 @@ const Profiles = () => {
 
               <View className="mt-6 flex-row items-center justify-between px-2">
                 {[
-                  { label: "Films", value: String(allWatchHistory.length) },
+                  { label: "Movies", value: String(allMovieHistory.length) },
+                  { label: "TV Shows", value: String(allTvHistory.length) },
                   { label: "Hours", value: formatHours(allWatchMinutes) },
-                  { label: "Lists", value: String(customLists.length) },
                 ].map((item) => (
                   <View key={item.label} className="items-center">
                     <Text
@@ -330,10 +430,16 @@ const Profiles = () => {
 
                 <View className="mt-5 flex-row items-end justify-between px-1">
                   <View>
-                    <Text className="text-4xl font-bold text-white">
-                      {rangedHistory.length}
+                    <Text className="text-4xl font-bold text-accentLight">
+                      {rangedMovieHistory.length}
                     </Text>
-                    <Text className="mt-2 text-sm text-white/70">Films watched</Text>
+                    <Text className="mt-2 text-sm text-white/70">Movies watched</Text>
+                  </View>
+                  <View className="items-center">
+                    <Text className="text-4xl font-bold text-[#F3B95F]">
+                      {rangedTvHistory.length}
+                    </Text>
+                    <Text className="mt-2 text-sm text-white/70">TV shows</Text>
                   </View>
                   <View className="items-end">
                     <Text className="text-4xl font-bold text-[#9FD6E3]">
@@ -363,6 +469,23 @@ const Profiles = () => {
                     </View>
                   </View>
 
+                  <View className="mt-4 flex-row items-center gap-x-4">
+                    {[
+                      { label: "Movies", color: "#3AB0FF", value: rangedMovieHistory.length },
+                      { label: "TV Shows", color: "#F3B95F", value: rangedTvHistory.length },
+                    ].map((item) => (
+                      <View key={item.label} className="flex-row items-center">
+                        <View
+                          className="mr-2 size-2.5 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <Text className="text-xs font-semibold text-white/75">
+                          {item.label} {item.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
                   <View className="mt-6 border-t border-white/10 pt-5">
                     <View
                       className="overflow-hidden rounded-[28px] border border-white/6 bg-white/[0.03] px-3 py-4"
@@ -383,53 +506,62 @@ const Profiles = () => {
 
                         <View className="absolute inset-x-0 bottom-4 h-px bg-white/12" />
 
-                        {chartPoints.slice(0, -1).map((point, index) => {
-                          const nextPoint = chartPoints[index + 1];
-                          const deltaX = nextPoint.x - point.x;
-                          const deltaY = nextPoint.y - point.y;
-                          const width = Math.sqrt(deltaX ** 2 + deltaY ** 2);
-                          const angle = `${(Math.atan2(deltaY, deltaX) * 180) / Math.PI}deg`;
+                        {[
+                          { id: "movies", color: "#3AB0FF", points: movieChartPoints },
+                          { id: "tv", color: "#F3B95F", points: tvChartPoints },
+                        ].map((series) => (
+                          <React.Fragment key={series.id}>
+                            {series.points.slice(0, -1).map((point, index) => {
+                              const nextPoint = series.points[index + 1];
+                              const deltaX = nextPoint.x - point.x;
+                              const deltaY = nextPoint.y - point.y;
+                              const width = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+                              const angle = `${
+                                (Math.atan2(deltaY, deltaX) * 180) / Math.PI
+                              }deg`;
 
-                          return (
-                            <View
-                              key={`${point.label}-line-${nextPoint.label}`}
-                              className="absolute h-[3px] rounded-full bg-accentLight"
-                              style={{
-                                left: point.x + deltaX / 2 - width / 2,
-                                top: point.y + deltaY / 2 - 1.5,
-                                width,
-                                shadowColor: "#3AB0FF",
-                                shadowOpacity: 0.35,
-                                shadowRadius: 6,
-                                transform: [{ rotate: angle }],
-                              }}
-                            />
-                          );
-                        })}
+                              return (
+                                <View
+                                  key={`${series.id}-${point.label}-line-${nextPoint.label}`}
+                                  className="absolute h-[3px] rounded-full"
+                                  style={{
+                                    left: point.x + deltaX / 2 - width / 2,
+                                    top: point.y + deltaY / 2 - 1.5,
+                                    width,
+                                    backgroundColor: series.color,
+                                    shadowColor: series.color,
+                                    shadowOpacity: 0.35,
+                                    shadowRadius: 6,
+                                    transform: [{ rotate: angle }],
+                                  }}
+                                />
+                              );
+                            })}
 
-                        {chartPoints.map((point) => (
-                          <View
-                            key={`${point.label}-point`}
-                            className="absolute items-center"
-                            style={{ left: point.x - 12, top: point.y - 24 }}
-                          >
-                            {point.value > 0 ? (
-                              <Text className="mb-2 text-[11px] font-semibold text-accentLight">
-                                {point.value}
-                              </Text>
-                            ) : (
-                              <View className="mb-2 h-[14px]" />
-                            )}
-                            <View className="size-3 items-center justify-center rounded-full bg-accentLight/20">
-                              <View className="size-1.5 rounded-full bg-accentLight" />
-                            </View>
-                          </View>
+                            {series.points.map((point) => (
+                              <View
+                                key={`${series.id}-${point.label}-point`}
+                                className="absolute items-center"
+                                style={{ left: point.x - 12, top: point.y - 6 }}
+                              >
+                                <View
+                                  className="size-3 items-center justify-center rounded-full"
+                                  style={{ backgroundColor: `${series.color}33` }}
+                                >
+                                  <View
+                                    className="size-1.5 rounded-full"
+                                    style={{ backgroundColor: series.color }}
+                                  />
+                                </View>
+                              </View>
+                            ))}
+                          </React.Fragment>
                         ))}
                       </View>
                     </View>
 
                     <View className="mt-5 flex-row justify-between px-1">
-                      {chart.map((bucket) => (
+                      {axisChart.map((bucket) => (
                         <Text
                           key={bucket.label}
                           className="text-xs font-medium text-white/65"
@@ -478,13 +610,26 @@ const Profiles = () => {
               <View className="mt-4 rounded-[26px] border border-white/10 bg-[#141D2D]/95 px-4 py-5">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-xl font-bold text-white">Recently Watched</Text>
-                  <Text className="text-sm text-accentLight">{allWatchHistory.length} films</Text>
+                  <Text className="text-sm text-accentLight">
+                    {allWatchHistory.length} titles
+                  </Text>
                 </View>
 
                 {allWatchHistory.length > 0 ? (
                   <View className="mt-4 gap-y-3">
                     {allWatchHistory.slice(0, 8).map((item) => {
-                      const details = watchDetailsById[item.movie_id];
+                      const mediaType = item.media_type ?? "movie";
+                      const mediaId = item.media_id ?? item.movie_id;
+                      const movieDetails = watchDetailsById[mediaId];
+                      const tvDetails = tvDetailsById[mediaId];
+                      const genres =
+                        mediaType === "tv"
+                          ? tvDetails?.genres?.map((genre) => genre.name).join(" • ")
+                          : movieDetails?.genres?.map((genre) => genre.name).join(" • ");
+                      const runtime =
+                        mediaType === "tv"
+                          ? tvDetails?.episode_run_time?.[0]
+                          : movieDetails?.runtime;
 
                       return (
                         <View
@@ -510,16 +655,22 @@ const Profiles = () => {
                               })}
                             </Text>
                             <Text className="mt-2 text-xs text-white/65" numberOfLines={2}>
-                              {details?.genres?.map((genre) => genre.name).join(" • ") ||
-                                "Genres unavailable"}
+                              {genres || "Genres unavailable"}
                             </Text>
                           </View>
                           <View className="items-end">
+                            <Text
+                              className={`text-xs font-semibold ${
+                                mediaType === "tv" ? "text-[#F3B95F]" : "text-accentLight"
+                              }`}
+                            >
+                              {mediaType === "tv" ? "TV" : "Movie"}
+                            </Text>
                             <Text className="text-sm font-semibold text-accentLight">
                               {Math.round(item.vote_average ?? 0)}/10
                             </Text>
                             <Text className="mt-2 text-xs text-white/65">
-                              {details?.runtime ? `${details.runtime}m` : "Logged"}
+                              {runtime ? `${runtime}m` : "Logged"}
                             </Text>
                           </View>
                         </View>
@@ -528,7 +679,7 @@ const Profiles = () => {
                   </View>
                 ) : (
                   <Text className="mt-4 leading-5 text-white/70">
-                    Mark titles as watched from the movie details page to start your log.
+                    Mark movies or TV shows as watched from a details page to start your log.
                   </Text>
                 )}
               </View>
@@ -561,7 +712,8 @@ const Profiles = () => {
                               {item.title}
                             </Text>
                               <Text className="mt-1 text-sm text-[#9FD6E3]">
-                                {item.release_date?.split("-")[0] || "Saved"}
+                                {item.release_date?.split("-")[0] || "Saved"} ·{" "}
+                                {(item.media_type ?? "movie") === "tv" ? "TV" : "Movie"}
                               </Text>
                             </View>
                           <Text className="text-sm text-white/65">
@@ -572,7 +724,7 @@ const Profiles = () => {
                     </View>
                   ) : (
                     <Text className="mt-4 leading-5 text-white/70">
-                      Use the bookmark button on a movie to save it to your default queue.
+                      Use the bookmark button on a movie or TV show to save it to your default queue.
                     </Text>
                   )}
                 </View>

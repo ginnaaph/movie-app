@@ -3,8 +3,8 @@ import FrameLogWordmark from "@/components/FrameLogWordmark";
 import SearchBar from "@/components/SearchBar";
 import TrendingCard from "@/components/TrendingCard";
 import { images } from "@/constants/images";
-import { fetchMovies } from "@/services/api";
-import { getTrendingMovies, updateSeachCount } from "@/services/appwrite";
+import { fetchMovies, fetchTvShows } from "@/services/api";
+import { getTrendingMedia, updateSearchCount } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
 import React, { useEffect, useState } from "react";
 import {
@@ -13,12 +13,14 @@ import {
   Image,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Movie[]>([]);
+  const [mediaType, setMediaType] = useState<MediaType>("movie");
+  const [searchResults, setSearchResults] = useState<(Movie | TVShow)[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -26,13 +28,17 @@ const Search = () => {
     data: trendingMovies,
     loading: trendingLoading,
     error: trendingError,
-  } = useFetch(getTrendingMovies);
+  } = useFetch(() => getTrendingMedia(mediaType), true, mediaType);
 
   const {
     data: latestMovies,
     loading: latestLoading,
     error: latestError,
-  } = useFetch(() => fetchMovies({ query: "" }));
+  } = useFetch(
+    () => (mediaType === "tv" ? fetchTvShows({ query: "" }) : fetchMovies({ query: "" })),
+    true,
+    mediaType,
+  );
 
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
@@ -47,11 +53,14 @@ const Search = () => {
         setSearchLoading(true);
         setSearchError(null);
 
-        const results = await fetchMovies({ query: searchQuery });
+        const results =
+          mediaType === "tv"
+            ? await fetchTvShows({ query: searchQuery })
+            : await fetchMovies({ query: searchQuery });
         setSearchResults(results);
 
         if (results.length > 0 && results[0]) {
-          await updateSeachCount(searchQuery, results[0]);
+          await updateSearchCount(searchQuery, results[0], mediaType);
         }
       } catch (error) {
         setSearchError(error instanceof Error ? error.message : "Search failed");
@@ -61,12 +70,13 @@ const Search = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [mediaType, searchQuery]);
 
   const isSearching = searchQuery.trim().length > 0;
   const discoveryLoading = trendingLoading || latestLoading;
   const discoveryError = trendingError || latestError;
   const gridData = isSearching ? searchResults : (latestMovies ?? []);
+  const mediaLabel = mediaType === "tv" ? "TV shows" : "movies";
 
   return (
     <View className="bg-primary flex-1">
@@ -74,7 +84,7 @@ const Search = () => {
       <FlatList
         data={gridData}
         renderItem={({ item }) => <MovieCard {...item} />}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => `${mediaType}-${item.id}`}
         numColumns={3}
         columnWrapperStyle={{
           justifyContent: "flex-start",
@@ -89,8 +99,34 @@ const Search = () => {
               <FrameLogWordmark scale={1.6} />
             </View>
             <View className="my-5">
+              <View className="mb-4 flex-row rounded-full border border-white/10 bg-[#111A28]/80 p-1">
+                {(["movie", "tv"] as MediaType[]).map((type) => {
+                  const selected = mediaType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      className={`flex-1 rounded-full px-4 py-3 ${
+                        selected ? "bg-accentLight" : "bg-transparent"
+                      }`}
+                      onPress={() => {
+                        setMediaType(type);
+                        setSearchResults([]);
+                        setSearchError(null);
+                      }}
+                    >
+                      <Text
+                        className={`text-center font-semibold ${
+                          selected ? "text-white" : "text-white/70"
+                        }`}
+                      >
+                        {type === "tv" ? "TV Shows" : "Movies"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
               <SearchBar
-                placeholder="Search for movies now, TV shows next..."
+                placeholder={`Search for ${mediaLabel}...`}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -131,7 +167,7 @@ const Search = () => {
                     {trendingMovies && trendingMovies.length > 0 ? (
                       <View className="mb-5">
                         <Text className="mb-3 mt-1 text-xl font-bold text-white">
-                          Trending Movies
+                          Trending {mediaType === "tv" ? "TV Shows" : "Movies"}
                         </Text>
                         <FlatList
                           horizontal
@@ -141,7 +177,9 @@ const Search = () => {
                           renderItem={({ item, index }) => (
                             <TrendingCard movie={item} index={index} />
                           )}
-                          keyExtractor={(item) => item.movie_id.toString()}
+                          keyExtractor={(item) =>
+                            `${item.media_type ?? mediaType}-${item.media_id ?? item.movie_id}`
+                          }
                           ItemSeparatorComponent={() => <View className="w-4" />}
                           scrollEnabled={false}
                         />
@@ -149,7 +187,7 @@ const Search = () => {
                     ) : null}
 
                     <Text className="mb-2 text-xl font-semibold text-white">
-                      Latest Movies
+                      {mediaType === "tv" ? "Latest TV Shows" : "Latest Movies"}
                     </Text>
                     <Text className="mb-2 text-accent">
                       Search when you know what you want, or browse what is popular right now.
@@ -164,7 +202,7 @@ const Search = () => {
           isSearching && !searchLoading && !searchError ? (
             <View className="mt-10 px-5">
               <Text className="text-center text-gray-500">
-                No movies found for that search yet.
+                No {mediaLabel} found for that search yet.
               </Text>
             </View>
           ) : null

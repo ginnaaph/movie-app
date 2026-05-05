@@ -21,7 +21,24 @@ export const fetchMovies = async ({ query }: { query: string }) => {
   }
 
   const data = await response.json();
-  return data.results;
+  return data.results.map((movie: Movie) => ({ ...movie, media_type: "movie" }));
+};
+
+export const fetchTvShows = async ({ query }: { query: string }) => {
+  const endpoint = query
+    ? `${TMBD_config.baseURL}/search/tv?query=${encodeURIComponent(query)}`
+    : `${TMBD_config.baseURL}/discover/tv?sort_by=popularity.desc`;
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: TMBD_config.headers,
+  });
+  if (!response.ok) {
+    //@ts-ignore
+    throw new Error("Failed to fetch TV shows", response.statusText);
+  }
+
+  const data = await response.json();
+  return data.results.map((show: TVShow) => ({ ...show, media_type: "tv" }));
 };
 
 export const fetchMovieDetails = async (
@@ -39,4 +56,19 @@ export const fetchMovieDetails = async (
 
   const data = await response.json();
   return data as MovieDetails;
+};
+
+export const fetchTvDetails = async (tv_id: string): Promise<TVDetails> => {
+  const endpoint = `${TMBD_config.baseURL}/tv/${tv_id}?api_key=${TMBD_config.API_KEY}&append_to_response=credits`;
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: TMBD_config.headers,
+  });
+  if (!response.ok) {
+    //@ts-ignore
+    throw new Error("Failed to fetch TV show details", response.statusText);
+  }
+
+  const data = await response.json();
+  return data as TVDetails;
 };

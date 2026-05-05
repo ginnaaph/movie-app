@@ -1,17 +1,24 @@
 import { icons } from "@/constants/icon";
-import { Link } from "expo-router";
+import { Href, Link } from "expo-router";
 import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 export const MovieCard = ({
   id,
   poster_path,
-  title,
+  media_type = "movie",
   vote_average,
-  release_date,
-}: Movie) => {
+  ...item
+}: Movie | TVShow) => {
+  const title = "title" in item ? item.title : item.name;
+  const releaseDate = "release_date" in item ? item.release_date : item.first_air_date;
+  const href = {
+    pathname: media_type === "tv" ? "/tv/[id]" : "/movies/[id]",
+    params: { id: id.toString() },
+  } as Href;
+
   return (
-    <Link href={`/movies/${id}`} asChild>
+    <Link href={href} asChild>
       <TouchableOpacity className="w-[30%]">
         <Image
           source={{
@@ -32,9 +39,11 @@ export const MovieCard = ({
         </View>
         <View className="flex-row items-center justify-between">
           <Text className="text-xs text-gray-400 font-medium mt-1">
-            {release_date?.split("-")[0]}
+            {releaseDate?.split("-")[0]}
           </Text>
-          <Text className="text-xs text-gray-400 font-medium mt-1">Movie</Text>
+          <Text className="text-xs text-gray-400 font-medium mt-1">
+            {media_type === "tv" ? "TV" : "Movie"}
+          </Text>
         </View>
       </TouchableOpacity>
     </Link>

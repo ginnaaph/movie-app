@@ -119,7 +119,7 @@ const Saved = () => {
                 <View className="flex-1 pr-4">
                   <Text className="text-3xl font-bold text-white">Saved</Text>
                   <Text className="mt-2 text-sm leading-6 text-[#9FD6E3]">
-                    Build lists for what you want to watch next and keep your queue tidy.
+                    Build lists for movies and TV shows you want to watch next.
                   </Text>
                 </View>
 
@@ -132,7 +132,7 @@ const Saved = () => {
               <View className="mt-5">
                 <SearchBar
                   onPress={() => router.push("/search")}
-                  placeholder="Find more movies to save..."
+                  placeholder="Find more titles to save..."
                 />
               </View>
 
@@ -191,7 +191,7 @@ const Saved = () => {
                           ) : null}
                         </View>
                         <Text className="mt-2 text-sm text-white/70">
-                          {items.length} {items.length === 1 ? "movie" : "movies"}
+                          {items.length} {items.length === 1 ? "title" : "titles"}
                         </Text>
                       </View>
 
@@ -217,10 +217,10 @@ const Saved = () => {
                       ) : (
                         <View className="mt-4 px-2">
                           <Text className="text-white text-base font-semibold">
-                            No movies here yet
+                            No titles here yet
                           </Text>
                           <Text className="mt-2 leading-6 text-white/70">
-                            Add movies from the details page to build this list.
+                            Add movies or TV shows from the details page to build this list.
                           </Text>
                         </View>
                       )
