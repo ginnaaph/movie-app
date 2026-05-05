@@ -102,17 +102,216 @@ const getMediaReleaseDate = (
   media: Movie | MovieDetails | TVShow | TVDetails,
 ) => ("release_date" in media ? media.release_date : media.first_air_date);
 
+const getErrorMessage = (error: unknown): string => {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return "";
+};
+
+const isUnknownAttributeError = (
+  error: unknown,
+  attribute: string,
+): boolean => {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("attribute") &&
+    message.includes(attribute.toLowerCase()) &&
+    (message.includes("unknown") ||
+      message.includes("not found") ||
+      message.includes("invalid"))
+  );
+};
+
 const getRowMediaType = (row: { media_type?: MediaType }) =>
   row.media_type ?? "movie";
 
-const getRowMediaId = (row: { movie_id: number; media_id?: number }) =>
-  row.media_id ?? row.movie_id;
+const getRowMediaId = (row: { movie_id?: number; media_id?: number }) =>
+  row.media_id ?? row.movie_id ?? 0;
 
 const matchesMedia = (
-  row: { movie_id: number; media_id?: number; media_type?: MediaType },
+  row: { movie_id?: number; media_id?: number; media_type?: MediaType },
   mediaId: number,
   mediaType: MediaType,
 ) => getRowMediaId(row) === mediaId && getRowMediaType(row) === mediaType;
+
+const listRowsByMediaId = async <T>({
+  tableId,
+  userId,
+  mediaId,
+  extraQueries = [],
+}: {
+  tableId: string;
+  userId: string;
+  mediaId: number;
+  extraQueries?: string[];
+}): Promise<T[]> => {
+  try {
+    const result = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId,
+      queries: [
+        Query.equal("user_id", userId),
+        ...extraQueries,
+        Query.equal("media_id", mediaId),
+        Query.limit(10),
+      ],
+    });
+
+    return result.rows as unknown as T[];
+  } catch (error) {
+    if (!isUnknownAttributeError(error, "media_id")) {
+      throw error;
+    }
+
+    const legacyResult = await tables.listRows({
+      databaseId: DATABASE_ID,
+      tableId,
+      queries: [
+        Query.equal("user_id", userId),
+        ...extraQueries,
+        Query.equal("movie_id", mediaId),
+        Query.limit(10),
+      ],
+    });
+
+    return legacyResult.rows as unknown as T[];
+  }
+};
+
+const withMediaIdPayload = <T extends Record<string, unknown>>(
+  data: T,
+  mediaId: number,
+): T & { media_id?: number; movie_id?: number } => ({
+  ...data,
+  media_id: mediaId,
+  movie_id: mediaId,
+});
+
+const omitKey = (
+  payload: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> => {
+  const { [key]: _removed, ...rest } = payload;
+  return rest;
+};
+
+const createRowWithMediaFieldFallback = async ({
+  tableId,
+  data,
+  mediaId,
+}: {
+  tableId: string;
+  data: Record<string, unknown>;
+  mediaId: number;
+}) => {
+  const createWithData = (payload: Record<string, unknown>) =>
+    tables.createRow({
+      databaseId: DATABASE_ID,
+      tableId,
+      rowId: ID.unique(),
+      data: payload,
+    });
+
+  const withMediaIds = withMediaIdPayload(data, mediaId);
+
+  try {
+    return await createWithData(withMediaIds);
+  } catch (error) {
+    if (isUnknownAttributeError(error, "media_type")) {
+      const payloadWithoutMediaType = omitKey(withMediaIds, "media_type");
+      try {
+        return await createWithData(payloadWithoutMediaType);
+      } catch (fallbackError) {
+        if (isUnknownAttributeError(fallbackError, "movie_id")) {
+          return createWithData({
+            ...omitKey(data, "media_type"),
+            media_id: mediaId,
+          });
+        }
+
+        if (isUnknownAttributeError(fallbackError, "media_id")) {
+          return createWithData({
+            ...omitKey(data, "media_type"),
+            movie_id: mediaId,
+          });
+        }
+
+        throw fallbackError;
+      }
+    }
+
+    if (isUnknownAttributeError(error, "movie_id")) {
+      return createWithData({ ...data, media_id: mediaId });
+    }
+
+    if (isUnknownAttributeError(error, "media_id")) {
+      return createWithData({ ...data, movie_id: mediaId });
+    }
+
+    throw error;
+  }
+};
+
+const updateRowWithMediaFieldFallback = async ({
+  tableId,
+  rowId,
+  data,
+  mediaId,
+}: {
+  tableId: string;
+  rowId: string;
+  data: Record<string, unknown>;
+  mediaId: number;
+}) => {
+  const updateWithData = (payload: Record<string, unknown>) =>
+    tables.updateRow({
+      databaseId: DATABASE_ID,
+      tableId,
+      rowId,
+      data: payload,
+    });
+
+  const withMediaIds = withMediaIdPayload(data, mediaId);
+
+  try {
+    return await updateWithData(withMediaIds);
+  } catch (error) {
+    if (isUnknownAttributeError(error, "media_type")) {
+      const payloadWithoutMediaType = omitKey(withMediaIds, "media_type");
+      try {
+        return await updateWithData(payloadWithoutMediaType);
+      } catch (fallbackError) {
+        if (isUnknownAttributeError(fallbackError, "movie_id")) {
+          return updateWithData({
+            ...omitKey(data, "media_type"),
+            media_id: mediaId,
+          });
+        }
+
+        if (isUnknownAttributeError(fallbackError, "media_id")) {
+          return updateWithData({
+            ...omitKey(data, "media_type"),
+            movie_id: mediaId,
+          });
+        }
+
+        throw fallbackError;
+      }
+    }
+
+    if (isUnknownAttributeError(error, "movie_id")) {
+      return updateWithData({ ...data, media_id: mediaId });
+    }
+
+    if (isUnknownAttributeError(error, "media_id")) {
+      return updateWithData({ ...data, movie_id: mediaId });
+    }
+
+    throw error;
+  }
+};
 
 const slugify = (value: string) =>
   value
@@ -262,7 +461,7 @@ const toListItemFromMetricRow = (
   $id: row.$id,
   user_id: userId,
   list_id: DEFAULT_SAVED_LIST_ID,
-  movie_id: row.movie_id,
+  movie_id: getRowMediaId(row),
   media_id: row.media_id ?? row.movie_id,
   media_type: getRowMediaType(row),
   title: row.title,
@@ -292,21 +491,13 @@ const getMetricsRowByMediaId = async (
   mediaId: number,
   mediaType: MediaType = "movie",
 ): Promise<TrendingMovie | null> => {
-  const result = await tables.listRows({
-    databaseId: DATABASE_ID,
+  const rows = await listRowsByMediaId<TrendingMovie>({
     tableId: SEARCH_METRICS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", userId),
-      Query.equal("movie_id", mediaId),
-      Query.limit(10),
-    ],
+    userId,
+    mediaId,
   });
 
-  return (
-    (result.rows as unknown as TrendingMovie[]).find((row) =>
-      matchesMedia(row, mediaId, mediaType),
-    ) ?? null
-  );
+  return rows.find((row) => matchesMedia(row, mediaId, mediaType)) ?? null;
 };
 
 const getSystemLists = (userId: string): MovieList[] => [
@@ -365,9 +556,10 @@ const getListItemsByMediaId = async (
   mediaId: number,
   mediaType: MediaType = "movie",
 ): Promise<ListItem[]> => {
-  const rows = await listRowsAll<ListItem>({
+  const rows = await listRowsByMediaId<ListItem>({
     tableId: LIST_ITEMS_TABLE_ID,
-    queries: [Query.equal("user_id", userId), Query.equal("movie_id", mediaId)],
+    userId,
+    mediaId,
   });
 
   return rows.filter((item) => matchesMedia(item, mediaId, mediaType));
@@ -408,16 +600,13 @@ export const updateSearchCount = async (
     }
   }
 
-  await tables.createRow({
-    databaseId: DATABASE_ID,
+  await createRowWithMediaFieldFallback({
     tableId: SEARCH_METRICS_TABLE_ID,
-    rowId: ID.unique(),
+    mediaId: media.id,
     data: {
       user_id: userId,
       searchTerm: query,
       count: 1,
-      movie_id: media.id,
-      media_id: media.id,
       media_type: mediaType,
       title: getMediaTitle(media),
       poster_url: toPosterUrl(media.poster_path),
@@ -601,33 +790,26 @@ export const addMediaToList = async (
 ): Promise<ListItem> => {
   const userId = await getCurrentUserId();
 
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
+  const existingRows = await listRowsByMediaId<ListItem>({
     tableId: LIST_ITEMS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", userId),
-      Query.equal("list_id", listId),
-      Query.equal("movie_id", media.id),
-      Query.limit(10),
-    ],
+    userId,
+    mediaId: media.id,
+    extraQueries: [Query.equal("list_id", listId)],
   });
 
-  const existingMediaRow = (existing.rows as unknown as ListItem[]).find(
-    (item) => matchesMedia(item, media.id, mediaType),
+  const existingMediaRow = existingRows.find((item) =>
+    matchesMedia(item, media.id, mediaType),
   );
   if (existingMediaRow) {
     return existingMediaRow;
   }
 
-  const created = await tables.createRow({
-    databaseId: DATABASE_ID,
+  const created = await createRowWithMediaFieldFallback({
     tableId: LIST_ITEMS_TABLE_ID,
-    rowId: ID.unique(),
+    mediaId: media.id,
     data: {
       user_id: userId,
       list_id: listId,
-      movie_id: media.id,
-      media_id: media.id,
       media_type: mediaType,
       title: getMediaTitle(media),
       poster_url: toPosterUrl(media.poster_path),
@@ -652,19 +834,15 @@ export const removeMediaFromList = async (
 ): Promise<void> => {
   const userId = await getCurrentUserId();
 
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
+  const existingRows = await listRowsByMediaId<ListItem>({
     tableId: LIST_ITEMS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", userId),
-      Query.equal("list_id", listId),
-      Query.equal("movie_id", mediaId),
-      Query.limit(10),
-    ],
+    userId,
+    mediaId,
+    extraQueries: [Query.equal("list_id", listId)],
   });
 
-  const existingMediaRow = (existing.rows as unknown as ListItem[]).find(
-    (item) => matchesMedia(item, mediaId, mediaType),
+  const existingMediaRow = existingRows.find((item) =>
+    matchesMedia(item, mediaId, mediaType),
   );
   if (!existingMediaRow) return;
 
@@ -719,16 +897,14 @@ export const saveMedia = async (
   const existing = await getMetricsRowByMediaId(userId, media.id, mediaType);
 
   if (existing) {
-    const result = await tables.updateRow({
-      databaseId: DATABASE_ID,
+    const result = await updateRowWithMediaFieldFallback({
       tableId: SEARCH_METRICS_TABLE_ID,
       rowId: existing.$id,
+      mediaId: media.id,
       data: {
         user_id: userId,
         searchTerm: existing.searchTerm || getMediaTitle(media),
         count: existing.count ?? 0,
-        movie_id: media.id,
-        media_id: media.id,
         media_type: mediaType,
         title: getMediaTitle(media),
         poster_url: toPosterUrl(media.poster_path),
@@ -741,16 +917,13 @@ export const saveMedia = async (
     return result as unknown as TrendingMovie;
   }
 
-  const result = await tables.createRow({
-    databaseId: DATABASE_ID,
+  const result = await createRowWithMediaFieldFallback({
     tableId: SEARCH_METRICS_TABLE_ID,
-    rowId: ID.unique(),
+    mediaId: media.id,
     data: {
       user_id: userId,
       searchTerm: getMediaTitle(media),
       count: 0,
-      movie_id: media.id,
-      media_id: media.id,
       media_type: mediaType,
       title: getMediaTitle(media),
       poster_url: toPosterUrl(media.poster_path),
@@ -792,29 +965,22 @@ export const markMediaWatched = async (
   const userId = await getCurrentUserId();
   const watchedList = await getDefaultWatchedList(userId);
 
-  const existing = await tables.listRows({
-    databaseId: DATABASE_ID,
+  const existingRows = await listRowsByMediaId<WatchHistoryEntry>({
     tableId: WATCH_HISTORY_TABLE_ID,
-    queries: [
-      Query.equal("user_id", userId),
-      Query.equal("movie_id", media.id),
-      Query.limit(10),
-    ],
+    userId,
+    mediaId: media.id,
   });
 
-  const existingMediaRow = (
-    existing.rows as unknown as WatchHistoryEntry[]
-  ).find((entry) => matchesMedia(entry, media.id, mediaType));
+  const existingMediaRow = existingRows.find((entry) =>
+    matchesMedia(entry, media.id, mediaType),
+  );
 
   if (!existingMediaRow) {
-    await tables.createRow({
-      databaseId: DATABASE_ID,
+    await createRowWithMediaFieldFallback({
       tableId: WATCH_HISTORY_TABLE_ID,
-      rowId: ID.unique(),
+      mediaId: media.id,
       data: {
         user_id: userId,
-        movie_id: media.id,
-        media_id: media.id,
         media_type: mediaType,
         title: getMediaTitle(media),
         poster_url: toPosterUrl(media.poster_path),

@@ -2,28 +2,28 @@ import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { icons } from "@/constants/icon";
 import { fetchTvDetails } from "@/services/api";
 import {
-  addMediaToList,
-  getLists,
-  getMediaListStatus,
-  markMediaWatched,
-  removeMediaFromList,
-  removeSavedMedia,
-  saveMedia,
+    addMediaToList,
+    getLists,
+    getMediaListStatus,
+    markMediaWatched,
+    removeMediaFromList,
+    removeSavedMedia,
+    saveMedia,
 } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -78,14 +78,35 @@ const CastCard = ({
       className="size-20 rounded-full border border-white/10"
       resizeMode="cover"
     />
-    <Text className="mt-3 text-center text-sm font-semibold text-white" numberOfLines={2}>
+    <Text
+      className="mt-3 text-center text-sm font-semibold text-white"
+      numberOfLines={2}
+    >
       {name}
     </Text>
-    <Text className="mt-1 text-center text-xs text-accentLight/80" numberOfLines={2}>
+    <Text
+      className="mt-1 text-center text-xs text-accentLight/80"
+      numberOfLines={2}
+    >
       {role}
     </Text>
   </View>
 );
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+
+  return fallback;
+};
 
 const TvDetails = () => {
   const router = useRouter();
@@ -126,7 +147,12 @@ const TvDetails = () => {
   );
   const topCrew = useMemo(() => {
     const crew = show?.credits?.crew ?? [];
-    const preferredJobs = ["Creator", "Executive Producer", "Writer", "Producer"];
+    const preferredJobs = [
+      "Creator",
+      "Executive Producer",
+      "Writer",
+      "Producer",
+    ];
     const selected = preferredJobs
       .map((job) => crew.find((person) => person.job === job))
       .filter(Boolean);
@@ -136,7 +162,9 @@ const TvDetails = () => {
 
   const metadata = [
     show?.first_air_date?.split("-")[0],
-    show?.episode_run_time?.[0] ? `${show.episode_run_time[0]}m episodes` : null,
+    show?.episode_run_time?.[0]
+      ? `${show.episode_run_time[0]}m episodes`
+      : null,
     show?.number_of_seasons
       ? `${show.number_of_seasons} ${show.number_of_seasons === 1 ? "season" : "seasons"}`
       : null,
@@ -156,8 +184,13 @@ const TvDetails = () => {
         await saveMedia(show, "tv");
         setSaved(true);
       }
-    } catch {
-      Alert.alert("Save failed", "The TV show could not be updated right now.");
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The TV show could not be updated right now.",
+      );
+      console.error("saveMedia(tv) failed", error);
+      Alert.alert("Save failed", message);
     } finally {
       setSaveLoading(false);
     }
@@ -170,8 +203,13 @@ const TvDetails = () => {
       setWatchLoading(true);
       await markMediaWatched(show, "tv");
       setWatched(true);
-    } catch {
-      Alert.alert("Watch update failed", "The TV show could not be marked as watched.");
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The TV show could not be marked as watched.",
+      );
+      console.error("markMediaWatched(tv) failed", error);
+      Alert.alert("Watch update failed", message);
     } finally {
       setWatchLoading(false);
     }
@@ -185,13 +223,20 @@ const TvDetails = () => {
       setListPickerLoading(true);
       if (isInList) {
         await removeMediaFromList(list.$id, show.id, "tv");
-        setShowCustomListIds((current) => current.filter((listId) => listId !== list.$id));
+        setShowCustomListIds((current) =>
+          current.filter((listId) => listId !== list.$id),
+        );
       } else {
         await addMediaToList(list.$id, show, "tv");
         setShowCustomListIds((current) => [...current, list.$id]);
       }
-    } catch {
-      Alert.alert("List update failed", "The list could not be updated right now.");
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The list could not be updated right now.",
+      );
+      console.error("toggleTvCustomList failed", error);
+      Alert.alert("List update failed", message);
     } finally {
       setListPickerLoading(false);
     }
@@ -301,9 +346,13 @@ const TvDetails = () => {
                   <View
                     key={genre.id}
                     className="rounded-full px-3 py-2"
-                    style={{ backgroundColor: genreColors[genre.name] || "#3AB0FF" }}
+                    style={{
+                      backgroundColor: genreColors[genre.name] || "#3AB0FF",
+                    }}
                   >
-                    <Text className="text-xs font-semibold text-white">{genre.name}</Text>
+                    <Text className="text-xs font-semibold text-white">
+                      {genre.name}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -317,7 +366,13 @@ const TvDetails = () => {
                 >
                   <ActionIconLabel
                     icon="+"
-                    label={saveLoading ? "Saving..." : saved ? "In My List" : "My List"}
+                    label={
+                      saveLoading
+                        ? "Saving..."
+                        : saved
+                          ? "In My List"
+                          : "My List"
+                    }
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -350,7 +405,9 @@ const TvDetails = () => {
             {show.overview || "No overview is available for this show yet."}
           </Text>
           <View className="mt-3 flex-row justify-end">
-            <TouchableOpacity onPress={() => setExpandedOverview((current) => !current)}>
+            <TouchableOpacity
+              onPress={() => setExpandedOverview((current) => !current)}
+            >
               <Text className="text-sm font-semibold text-[#9FD6E3]">
                 {expandedOverview ? "Show Less" : "Read More"}
               </Text>
@@ -358,11 +415,15 @@ const TvDetails = () => {
           </View>
 
           <View className="mt-7">
-            <Text className="text-lg font-bold text-white">Top Cast & Crew</Text>
+            <Text className="text-lg font-bold text-white">
+              Top Cast & Crew
+            </Text>
 
             {topCast.length > 0 ? (
               <>
-                <Text className="mt-4 text-sm font-semibold text-[#9FD6E3]">Cast</Text>
+                <Text className="mt-4 text-sm font-semibold text-[#9FD6E3]">
+                  Cast
+                </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -383,7 +444,9 @@ const TvDetails = () => {
 
             {show.created_by?.length > 0 ? (
               <>
-                <Text className="mt-5 text-sm font-semibold text-[#9FD6E3]">Created By</Text>
+                <Text className="mt-5 text-sm font-semibold text-[#9FD6E3]">
+                  Created By
+                </Text>
                 <Text className="mt-3 text-sm leading-7 text-white/90">
                   {show.created_by.map((creator) => creator.name).join(" • ")}
                 </Text>
@@ -392,7 +455,9 @@ const TvDetails = () => {
 
             {topCrew.length > 0 ? (
               <>
-                <Text className="mt-5 text-sm font-semibold text-[#9FD6E3]">Crew</Text>
+                <Text className="mt-5 text-sm font-semibold text-[#9FD6E3]">
+                  Crew
+                </Text>
                 <View className="mt-3 gap-y-3">
                   {topCrew.map((person) => (
                     <View
@@ -412,7 +477,9 @@ const TvDetails = () => {
                         <Text className="text-sm font-semibold text-white">
                           {person.name}
                         </Text>
-                        <Text className="mt-1 text-xs text-white/70">{person.job}</Text>
+                        <Text className="mt-1 text-xs text-white/70">
+                          {person.job}
+                        </Text>
                       </View>
                     </View>
                   ))}
@@ -446,7 +513,9 @@ const TvDetails = () => {
           <View className="mb-5 flex-row items-center justify-between">
             <Text className="text-lg font-bold text-white">Add to List</Text>
             <TouchableOpacity onPress={() => setShowListPicker(false)}>
-              <Text className="text-sm font-semibold text-accentLight">Done</Text>
+              <Text className="text-sm font-semibold text-accentLight">
+                Done
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -467,7 +536,9 @@ const TvDetails = () => {
                     onPress={() => handleToggleCustomList(item)}
                     disabled={listPickerLoading}
                   >
-                    <Text className="text-base font-semibold text-white">{item.name}</Text>
+                    <Text className="text-base font-semibold text-white">
+                      {item.name}
+                    </Text>
                     {isInList ? (
                       <Text className="text-lg text-accentLight">✓</Text>
                     ) : (

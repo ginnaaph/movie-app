@@ -2,28 +2,28 @@ import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { icons } from "@/constants/icon";
 import { fetchMovieDetails } from "@/services/api";
 import {
-  addMovieToList,
-  getLists,
-  getMovieListStatus,
-  markMovieWatched,
-  removeMovieFromList,
-  removeSavedMovie,
-  saveMovie,
+    addMovieToList,
+    getLists,
+    getMovieListStatus,
+    markMovieWatched,
+    removeMovieFromList,
+    removeSavedMovie,
+    saveMovie,
 } from "@/services/appwrite";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -94,6 +94,21 @@ const CastCard = ({
   </View>
 );
 
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+
+  return fallback;
+};
+
 const MovieDetails = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -162,8 +177,13 @@ const MovieDetails = () => {
         await saveMovie(movie);
         setSaved(true);
       }
-    } catch {
-      Alert.alert("Save failed", "The movie could not be updated right now.");
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The movie could not be updated right now.",
+      );
+      console.error("saveMovie failed", error);
+      Alert.alert("Save failed", message);
     } finally {
       setSaveLoading(false);
     }
@@ -176,11 +196,13 @@ const MovieDetails = () => {
       setWatchLoading(true);
       await markMovieWatched(movie);
       setWatched(true);
-    } catch {
-      Alert.alert(
-        "Watch update failed",
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
         "The movie could not be marked as watched.",
       );
+      console.error("markMovieWatched failed", error);
+      Alert.alert("Watch update failed", message);
     } finally {
       setWatchLoading(false);
     }
@@ -193,13 +215,20 @@ const MovieDetails = () => {
       setListPickerLoading(true);
       if (isInList) {
         await removeMovieFromList(list.$id, movie.id);
-        setMovieCustomListIds((current) => current.filter((id) => id !== list.$id));
+        setMovieCustomListIds((current) =>
+          current.filter((id) => id !== list.$id),
+        );
       } else {
         await addMovieToList(list.$id, movie);
         setMovieCustomListIds((current) => [...current, list.$id]);
       }
-    } catch {
-      Alert.alert("List update failed", "The list could not be updated right now.");
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The list could not be updated right now.",
+      );
+      console.error("toggleMovieCustomList failed", error);
+      Alert.alert("List update failed", message);
     } finally {
       setListPickerLoading(false);
     }
@@ -473,7 +502,9 @@ const MovieDetails = () => {
           <View className="mb-5 flex-row items-center justify-between">
             <Text className="text-lg font-bold text-white">Add to List</Text>
             <TouchableOpacity onPress={() => setShowListPicker(false)}>
-              <Text className="text-sm font-semibold text-accentLight">Done</Text>
+              <Text className="text-sm font-semibold text-accentLight">
+                Done
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -494,7 +525,9 @@ const MovieDetails = () => {
                     onPress={() => handleToggleCustomList(item)}
                     disabled={listPickerLoading}
                   >
-                    <Text className="text-base font-semibold text-white">{item.name}</Text>
+                    <Text className="text-base font-semibold text-white">
+                      {item.name}
+                    </Text>
                     {isInList ? (
                       <Text className="text-lg text-accentLight">✓</Text>
                     ) : (
