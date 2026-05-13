@@ -21,7 +21,9 @@ const Saved = () => {
   const router = useRouter();
   const isFocused = useIsFocused();
   const [lists, setLists] = useState<MovieList[]>([]);
-  const [itemsByList, setItemsByList] = useState<Record<string, ListItem[]>>({});
+  const [itemsByList, setItemsByList] = useState<Record<string, ListItem[]>>(
+    {},
+  );
   const [expandedListIds, setExpandedListIds] = useState<string[]>([]);
   const [newListName, setNewListName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -36,14 +38,19 @@ const Saved = () => {
 
         const loadedLists = await getLists();
         const listItems = await Promise.all(
-          loadedLists.map(async (list) => [list.$id, await getListItems(list.$id)] as const),
+          loadedLists.map(
+            async (list) => [list.$id, await getListItems(list.$id)] as const,
+          ),
         );
 
         setLists(loadedLists);
         setItemsByList(Object.fromEntries(listItems));
         setExpandedListIds(
           loadedLists
-            .filter((list) => list.slug === "saved-list" || list.slug === "watched-list")
+            .filter(
+              (list) =>
+                list.slug === "saved-list" || list.slug === "watched-list",
+            )
             .map((list) => list.$id),
         );
       } catch {
@@ -68,7 +75,8 @@ const Saved = () => {
 
       setLists((current) =>
         [...current, list].sort((left, right) => {
-          if (left.is_default !== right.is_default) return left.is_default ? -1 : 1;
+          if (left.is_default !== right.is_default)
+            return left.is_default ? -1 : 1;
           if (left.type !== right.type) return left.type === "system" ? -1 : 1;
           return left.name.localeCompare(right.name);
         }),
@@ -78,7 +86,9 @@ const Saved = () => {
       setNewListName("");
     } catch (createError) {
       setError(
-        createError instanceof Error ? createError.message : "List could not be created.",
+        createError instanceof Error
+          ? createError.message
+          : "List could not be created.",
       );
     } finally {
       setCreating(false);
@@ -94,7 +104,10 @@ const Saved = () => {
   };
 
   const totalSaved = Object.entries(itemsByList)
-    .filter(([listId]) => lists.find((list) => list.$id === listId)?.slug !== "watched-list")
+    .filter(
+      ([listId]) =>
+        lists.find((list) => list.$id === listId)?.slug !== "watched-list",
+    )
     .reduce((count, [, items]) => count + items.length, 0);
 
   return (
@@ -106,13 +119,17 @@ const Saved = () => {
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 66 }}
       >
         {loading ? (
-          <ActivityIndicator size="large" color="#3AB0FF" className="mt-20 self-center" />
+          <ActivityIndicator
+            size="large"
+            color="#3AB0FF"
+            className="mt-20 self-center"
+          />
         ) : (
           <>
             <View className="items-center px-2">
               <Image
                 source={images.framelogIcon}
-                className="size-16"
+                className="size-10"
                 resizeMode="contain"
               />
             </View>
@@ -127,8 +144,12 @@ const Saved = () => {
                 </View>
 
                 <View className="mt-1 items-end">
-                  <Text className="text-3xl font-bold text-white">{totalSaved}</Text>
-                  <Text className="mt-1 text-sm text-white/70">queued titles</Text>
+                  <Text className="text-3xl font-bold text-white">
+                    {totalSaved}
+                  </Text>
+                  <Text className="mt-1 text-sm text-white/70">
+                    queued titles
+                  </Text>
                 </View>
               </View>
 
@@ -161,7 +182,9 @@ const Saved = () => {
                     </Text>
                   </TouchableOpacity>
                 </View>
-                {error ? <Text className="mt-3 text-sm text-[#F28B82]">{error}</Text> : null}
+                {error ? (
+                  <Text className="mt-3 text-sm text-[#F28B82]">{error}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -186,7 +209,9 @@ const Saved = () => {
                     >
                       <View className="flex-1 pr-4">
                         <View className="flex-row items-center gap-x-3">
-                          <Text className="text-2xl font-bold text-white">{list.name}</Text>
+                          <Text className="text-2xl font-bold text-white">
+                            {list.name}
+                          </Text>
                           {label ? (
                             <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#9FD6E3]">
                               {label}
@@ -194,7 +219,8 @@ const Saved = () => {
                           ) : null}
                         </View>
                         <Text className="mt-2 text-sm text-white/70">
-                          {items.length} {items.length === 1 ? "title" : "titles"}
+                          {items.length}{" "}
+                          {items.length === 1 ? "title" : "titles"}
                         </Text>
                       </View>
 
@@ -210,12 +236,17 @@ const Saved = () => {
                           showsHorizontalScrollIndicator={false}
                           className="mt-4"
                           data={items}
-                          contentContainerStyle={{ paddingLeft: 8, paddingRight: 20 }}
+                          contentContainerStyle={{
+                            paddingLeft: 8,
+                            paddingRight: 20,
+                          }}
                           renderItem={({ item, index }) => (
                             <SavedCard movie={item} index={index} />
                           )}
                           keyExtractor={(item) => item.$id}
-                          ItemSeparatorComponent={() => <View className="w-4" />}
+                          ItemSeparatorComponent={() => (
+                            <View className="w-4" />
+                          )}
                         />
                       ) : (
                         <View className="mt-4 px-2">
@@ -223,7 +254,8 @@ const Saved = () => {
                             No titles here yet
                           </Text>
                           <Text className="mt-2 leading-6 text-white/70">
-                            Add movies or TV shows from the details page to build this list.
+                            Add movies or TV shows from the details page to
+                            build this list.
                           </Text>
                         </View>
                       )

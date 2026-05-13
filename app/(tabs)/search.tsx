@@ -34,7 +34,10 @@ const Search = () => {
     loading: latestLoading,
     error: latestError,
   } = useFetch(
-    () => (mediaType === "tv" ? fetchTvShows({ query: "" }) : fetchMovies({ query: "" })),
+    () =>
+      mediaType === "tv"
+        ? fetchTvShows({ query: "" })
+        : fetchMovies({ query: "" }),
     true,
     mediaType,
   );
@@ -62,7 +65,9 @@ const Search = () => {
           await updateSearchCount(searchQuery, results[0], mediaType);
         }
       } catch (error) {
-        setSearchError(error instanceof Error ? error.message : "Search failed");
+        setSearchError(
+          error instanceof Error ? error.message : "Search failed",
+        );
       } finally {
         setSearchLoading(false);
       }
@@ -97,7 +102,7 @@ const Search = () => {
             <View className="mt-20 w-full flex-row items-center justify-center">
               <Image
                 source={images.framelogIcon}
-                className="size-16"
+                className="size-10"
                 resizeMode="contain"
               />
             </View>
@@ -151,7 +156,8 @@ const Search = () => {
                 ) : null}
                 {!searchLoading && !searchError ? (
                   <Text className="mb-3 text-xl font-bold text-white">
-                    Results for <Text className="text-accent">{searchQuery}</Text>
+                    Results for{" "}
+                    <Text className="text-accent">{searchQuery}</Text>
                   </Text>
                 ) : null}
               </>
@@ -183,7 +189,9 @@ const Search = () => {
                           keyExtractor={(item) =>
                             `${item.media_type ?? mediaType}-${item.media_id ?? item.movie_id}`
                           }
-                          ItemSeparatorComponent={() => <View className="w-4" />}
+                          ItemSeparatorComponent={() => (
+                            <View className="w-4" />
+                          )}
                           scrollEnabled={false}
                         />
                       </View>
@@ -193,7 +201,8 @@ const Search = () => {
                       {mediaType === "tv" ? "Latest TV Shows" : "Latest Movies"}
                     </Text>
                     <Text className="mb-2 text-accent">
-                      Search when you know what you want, or browse what is popular right now.
+                      Search when you know what you want, or browse what is
+                      popular right now.
                     </Text>
                   </>
                 )}

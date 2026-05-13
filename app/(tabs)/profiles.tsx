@@ -30,7 +30,8 @@ const sections = [
   { label: "Watchlist", value: "watchlist" },
 ] as const;
 
-const getInitial = (name?: string) => (name?.trim()?.charAt(0) || "M").toUpperCase();
+const getInitial = (name?: string) =>
+  (name?.trim()?.charAt(0) || "M").toUpperCase();
 
 const formatHours = (minutes: number) => {
   if (!minutes) return "0";
@@ -85,15 +86,18 @@ const getGenreBreakdown = (
     const mediaId = entry.media_id ?? entry.movie_id;
     const genres =
       mediaType === "tv"
-        ? tvDetailsById[mediaId]?.genres ?? []
-        : movieDetailsById[mediaId]?.genres ?? [];
+        ? (tvDetailsById[mediaId]?.genres ?? [])
+        : (movieDetailsById[mediaId]?.genres ?? []);
 
     genres.forEach((genre) => {
       counts.set(genre.name, (counts.get(genre.name) ?? 0) + 1);
     });
   });
 
-  const total = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+  const total = Array.from(counts.values()).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
 
   return Array.from(counts.entries())
     .sort((left, right) => right[1] - left[1])
@@ -120,6 +124,7 @@ const genreTone: Record<string, string> = {
 
 const chartHorizontalPadding = 10;
 const chartHeight = 140;
+const chartPointSize = 12;
 
 const getChartPoints = (
   chart: ChartBucket[],
@@ -129,9 +134,7 @@ const getChartPoints = (
   const usableHeight = chartHeight - 28;
   const usableWidth = Math.max(chartWidth - chartHorizontalPadding * 2, 0);
   const stepX =
-    chart.length > 1
-      ? usableWidth / (chart.length - 1)
-      : usableWidth;
+    chart.length > 1 ? usableWidth / (chart.length - 1) : usableWidth;
 
   return chart.map((bucket, index) => {
     const x = chartHorizontalPadding + index * stepX;
@@ -165,7 +168,8 @@ const buildChartFromHistory = (
 
       return {
         label: date.toLocaleDateString("en-US", { weekday: "short" }),
-        value: history.filter((entry) => entry.watched_at.slice(0, 10) === key).length,
+        value: history.filter((entry) => entry.watched_at.slice(0, 10) === key)
+          .length,
       };
     });
   }
@@ -189,11 +193,19 @@ const buildChartFromHistory = (
 
   const latest =
     history.length > 0
-      ? new Date(Math.max(...history.map((entry) => new Date(entry.watched_at).getTime())))
+      ? new Date(
+          Math.max(
+            ...history.map((entry) => new Date(entry.watched_at).getTime()),
+          ),
+        )
       : now;
 
   return Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(latest.getFullYear(), latest.getMonth() - (5 - index), 1);
+    const date = new Date(
+      latest.getFullYear(),
+      latest.getMonth() - (5 - index),
+      1,
+    );
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -201,7 +213,9 @@ const buildChartFromHistory = (
       label: date.toLocaleDateString("en-US", { month: "short" }),
       value: history.filter((entry) => {
         const watchedAt = new Date(entry.watched_at);
-        return watchedAt.getFullYear() === year && watchedAt.getMonth() === month;
+        return (
+          watchedAt.getFullYear() === year && watchedAt.getMonth() === month
+        );
       }).length,
     };
   });
@@ -210,17 +224,22 @@ const buildChartFromHistory = (
 const Profiles = () => {
   const isFocused = useIsFocused();
   const [range, setRange] = useState<ProfileRange>("week");
-  const [section, setSection] = useState<(typeof sections)[number]["value"]>(
-    "activity",
-  );
+  const [section, setSection] =
+    useState<(typeof sections)[number]["value"]>("activity");
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [allWatchHistory, setAllWatchHistory] = useState<WatchHistoryEntry[]>([]);
+  const [allWatchHistory, setAllWatchHistory] = useState<WatchHistoryEntry[]>(
+    [],
+  );
   const [watchDetailsById, setWatchDetailsById] = useState<
     Record<number, MovieDetails>
   >({});
-  const [tvDetailsById, setTvDetailsById] = useState<Record<number, TVDetails>>({});
+  const [tvDetailsById, setTvDetailsById] = useState<Record<number, TVDetails>>(
+    {},
+  );
   const [lists, setLists] = useState<MovieList[]>([]);
-  const [itemsByList, setItemsByList] = useState<Record<string, ListItem[]>>({});
+  const [itemsByList, setItemsByList] = useState<Record<string, ListItem[]>>(
+    {},
+  );
   const [chartWidth, setChartWidth] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -239,7 +258,9 @@ const Profiles = () => {
         const loadedProfile =
           profileResult.status === "fulfilled" ? profileResult.value : null;
         const loadedWatchHistory =
-          watchHistoryResult.status === "fulfilled" ? watchHistoryResult.value : [];
+          watchHistoryResult.status === "fulfilled"
+            ? watchHistoryResult.value
+            : [];
         const loadedLists =
           listsResult.status === "fulfilled" ? listsResult.value : [];
 
@@ -248,7 +269,9 @@ const Profiles = () => {
         setLists(loadedLists);
 
         const listEntries = await Promise.all(
-          loadedLists.map(async (list) => [list.$id, await getListItems(list.$id)] as const),
+          loadedLists.map(
+            async (list) => [list.$id, await getListItems(list.$id)] as const,
+          ),
         );
         setItemsByList(Object.fromEntries(listEntries));
 
@@ -300,7 +323,8 @@ const Profiles = () => {
   }, [isFocused, range]);
 
   const rangedHistory = filterHistoryByRange(allWatchHistory, range);
-  const { movies: allMovieHistory, tv: allTvHistory } = splitHistoryByMedia(allWatchHistory);
+  const { movies: allMovieHistory, tv: allTvHistory } =
+    splitHistoryByMedia(allWatchHistory);
   const { movies: rangedMovieHistory, tv: rangedTvHistory } =
     splitHistoryByMedia(rangedHistory);
   const movieChart = buildChartFromHistory(rangedMovieHistory, range);
@@ -311,14 +335,30 @@ const Profiles = () => {
     ...tvChart.map((bucket) => bucket.value),
     1,
   );
-  const movieChartPoints = getChartPoints(movieChart, chartWidth, maxChartValue);
+  const movieChartPoints = getChartPoints(
+    movieChart,
+    chartWidth,
+    maxChartValue,
+  );
   const tvChartPoints = getChartPoints(tvChart, chartWidth, maxChartValue);
   const axisChartPoints = getChartPoints(axisChart, chartWidth, maxChartValue);
-  const allWatchMinutes = getWatchMinutes(allWatchHistory, watchDetailsById, tvDetailsById);
-  const rangeWatchMinutes = getWatchMinutes(rangedHistory, watchDetailsById, tvDetailsById);
-  const topGenres = getGenreBreakdown(rangedHistory, watchDetailsById, tvDetailsById);
+  const allWatchMinutes = getWatchMinutes(
+    allWatchHistory,
+    watchDetailsById,
+    tvDetailsById,
+  );
+  const rangeWatchMinutes = getWatchMinutes(
+    rangedHistory,
+    watchDetailsById,
+    tvDetailsById,
+  );
+  const topGenres = getGenreBreakdown(
+    rangedHistory,
+    watchDetailsById,
+    tvDetailsById,
+  );
   const savedList = lists.find((list) => list.slug === "saved-list");
-  const savedItems = savedList ? itemsByList[savedList.$id] ?? [] : [];
+  const savedItems = savedList ? (itemsByList[savedList.$id] ?? []) : [];
   const customLists = lists.filter((list) => list.type === "custom");
 
   return (
@@ -330,13 +370,17 @@ const Profiles = () => {
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 66 }}
       >
         {loading ? (
-          <ActivityIndicator size="large" color="#E77023" className="mt-20 self-center" />
+          <ActivityIndicator
+            size="large"
+            color="#E77023"
+            className="mt-20 self-center"
+          />
         ) : (
           <>
             <View className="items-center px-2">
               <Image
                 source={images.framelogIcon}
-                className="size-16"
+                className="size-10"
                 resizeMode="contain"
               />
             </View>
@@ -350,7 +394,10 @@ const Profiles = () => {
                     </Text>
                   </View>
                   <View className="ml-3 flex-1">
-                    <Text className="text-2xl font-bold text-white" numberOfLines={1}>
+                    <Text
+                      className="text-2xl font-bold text-white"
+                      numberOfLines={1}
+                    >
                       {profile?.name || "FrameLog"}
                     </Text>
                   </View>
@@ -371,7 +418,9 @@ const Profiles = () => {
                     >
                       {item.value}
                     </Text>
-                    <Text className="mt-1 text-sm text-white/70">{item.label}</Text>
+                    <Text className="mt-1 text-sm text-white/70">
+                      {item.label}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -421,12 +470,12 @@ const Profiles = () => {
                         onPress={() => setRange(item.value)}
                       >
                         <Text
-                        className={`text-center text-sm font-semibold ${
-                          active ? "text-white" : "text-white/75"
-                        }`}
-                      >
-                        {item.label}
-                      </Text>
+                          className={`text-center text-sm font-semibold ${
+                            active ? "text-white" : "text-white/75"
+                          }`}
+                        >
+                          {item.label}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -437,7 +486,9 @@ const Profiles = () => {
                     <Text className="text-4xl font-bold text-accentLight">
                       {rangedMovieHistory.length}
                     </Text>
-                    <Text className="mt-2 text-sm text-white/70">Movies watched</Text>
+                    <Text className="mt-2 text-sm text-white/70">
+                      Movies watched
+                    </Text>
                   </View>
                   <View className="items-center">
                     <Text className="text-4xl font-bold text-[#F3B95F]">
@@ -450,14 +501,18 @@ const Profiles = () => {
                       {formatHours(rangeWatchMinutes)}
                       <Text className="text-lg text-white/70">h</Text>
                     </Text>
-                    <Text className="mt-2 text-sm text-white/70">Watch time</Text>
+                    <Text className="mt-2 text-sm text-white/70">
+                      Watch time
+                    </Text>
                   </View>
                 </View>
 
                 <View className="mt-6 px-1">
                   <View className="flex-row items-center justify-between">
                     <View>
-                      <Text className="text-xl font-bold text-white">Watch Activity</Text>
+                      <Text className="text-xl font-bold text-white">
+                        Watch Activity
+                      </Text>
                       <Text className="mt-1 text-sm text-white/65">
                         {range === "week"
                           ? "7 days"
@@ -475,8 +530,16 @@ const Profiles = () => {
 
                   <View className="mt-4 flex-row items-center gap-x-4">
                     {[
-                      { label: "Movies", color: "#3AB0FF", value: rangedMovieHistory.length },
-                      { label: "TV Shows", color: "#F3B95F", value: rangedTvHistory.length },
+                      {
+                        label: "Movies",
+                        color: "#3AB0FF",
+                        value: rangedMovieHistory.length,
+                      },
+                      {
+                        label: "TV Shows",
+                        color: "#F3B95F",
+                        value: rangedTvHistory.length,
+                      },
                     ].map((item) => (
                       <View key={item.label} className="flex-row items-center">
                         <View
@@ -491,9 +554,7 @@ const Profiles = () => {
                   </View>
 
                   <View className="mt-6 border-t border-white/10 pt-5">
-                    <View
-                      className="overflow-hidden rounded-[28px] border border-white/6 bg-white/[0.03] px-3 py-4"
-                    >
+                    <View className="overflow-hidden rounded-[28px] border border-white/6 bg-white/[0.03] px-3 py-4">
                       <View
                         style={{ height: chartHeight }}
                         onLayout={(event) =>
@@ -504,14 +565,20 @@ const Profiles = () => {
                           <View
                             key={`grid-${index}`}
                             className="absolute inset-x-0 border-t border-white/6"
-                            style={{ top: index * ((chartHeight - 20) / 3) + 8 }}
+                            style={{
+                              top: index * ((chartHeight - 20) / 3) + 8,
+                            }}
                           />
                         ))}
 
                         <View className="absolute inset-x-0 bottom-4 h-px bg-white/12" />
 
                         {[
-                          { id: "movies", color: "#3AB0FF", points: movieChartPoints },
+                          {
+                            id: "movies",
+                            color: "#3AB0FF",
+                            points: movieChartPoints,
+                          },
                           { id: "tv", color: "#F3B95F", points: tvChartPoints },
                         ].map((series) => (
                           <React.Fragment key={series.id}>
@@ -519,7 +586,9 @@ const Profiles = () => {
                               const nextPoint = series.points[index + 1];
                               const deltaX = nextPoint.x - point.x;
                               const deltaY = nextPoint.y - point.y;
-                              const width = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+                              const width = Math.sqrt(
+                                deltaX ** 2 + deltaY ** 2,
+                              );
                               const angle = `${
                                 (Math.atan2(deltaY, deltaX) * 180) / Math.PI
                               }deg`;
@@ -546,11 +615,16 @@ const Profiles = () => {
                               <View
                                 key={`${series.id}-${point.label}-point`}
                                 className="absolute items-center"
-                                style={{ left: point.x - 12, top: point.y - 6 }}
+                                style={{
+                                  left: point.x - chartPointSize / 2,
+                                  top: point.y - chartPointSize / 2,
+                                }}
                               >
                                 <View
                                   className="size-3 items-center justify-center rounded-full"
-                                  style={{ backgroundColor: `${series.color}33` }}
+                                  style={{
+                                    backgroundColor: `${series.color}33`,
+                                  }}
                                 >
                                   <View
                                     className="size-1.5 rounded-full"
@@ -582,32 +656,38 @@ const Profiles = () => {
                 </View>
 
                 <View className="mt-8 px-1">
-                  <Text className="text-xl font-bold text-white">Top Genres</Text>
+                  <Text className="text-xl font-bold text-white">
+                    Top Genres
+                  </Text>
                   {topGenres.length > 0 ? (
                     <View className="mt-4 gap-y-4">
                       {topGenres.map((genre) => (
                         <View key={genre.name}>
                           <View className="flex-row items-center justify-between">
-                          <Text className="text-base font-medium text-white">{genre.name}</Text>
-                          <Text className="text-sm text-secondary">
-                            {genre.percentage}%
-                          </Text>
-                        </View>
-                        <View className="mt-2 h-1.5 rounded-full bg-[#0F1725]">
-                          <View
+                            <Text className="text-base font-medium text-white">
+                              {genre.name}
+                            </Text>
+                            <Text className="text-sm text-secondary">
+                              {genre.percentage}%
+                            </Text>
+                          </View>
+                          <View className="mt-2 h-1.5 rounded-full bg-[#0F1725]">
+                            <View
                               className="h-1.5 rounded-full"
                               style={{
                                 width: `${Math.max(genre.percentage, 10)}%`,
-                                backgroundColor: genreTone[genre.name] || "#3AB0FF",
+                                backgroundColor:
+                                  genreTone[genre.name] || "#3AB0FF",
                               }}
-                          />
+                            />
+                          </View>
                         </View>
-                      </View>
                       ))}
                     </View>
                   ) : (
                     <Text className="mt-3 leading-5 text-white/70">
-                      Genre trends will appear after you mark more films as watched.
+                      Genre trends will appear after you mark more films as
+                      watched.
                     </Text>
                   )}
                 </View>
@@ -617,7 +697,9 @@ const Profiles = () => {
             {section === "watched" ? (
               <View className="mt-4 rounded-[26px] border border-white/10 bg-[#141D2D]/95 px-4 py-5">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-xl font-bold text-white">Recently Watched</Text>
+                  <Text className="text-xl font-bold text-white">
+                    Recently Watched
+                  </Text>
                   <Text className="text-sm text-accentLight">
                     {allWatchHistory.length} titles
                   </Text>
@@ -632,8 +714,12 @@ const Profiles = () => {
                       const tvDetails = tvDetailsById[mediaId];
                       const genres =
                         mediaType === "tv"
-                          ? tvDetails?.genres?.map((genre) => genre.name).join(" • ")
-                          : movieDetails?.genres?.map((genre) => genre.name).join(" • ");
+                          ? tvDetails?.genres
+                              ?.map((genre) => genre.name)
+                              .join(" • ")
+                          : movieDetails?.genres
+                              ?.map((genre) => genre.name)
+                              .join(" • ");
                       const runtime =
                         mediaType === "tv"
                           ? tvDetails?.episode_run_time?.[0]
@@ -646,30 +732,43 @@ const Profiles = () => {
                         >
                           <Image
                             source={{
-                              uri: item.poster_url || "https://placehold.co/600x400/1a1a1a.png",
+                              uri:
+                                item.poster_url ||
+                                "https://placehold.co/600x400/1a1a1a.png",
                             }}
                             className="h-20 w-14 rounded-xl"
                             resizeMode="cover"
                           />
                           <View className="ml-3 flex-1">
-                            <Text className="text-base font-semibold text-white" numberOfLines={1}>
+                            <Text
+                              className="text-base font-semibold text-white"
+                              numberOfLines={1}
+                            >
                               {item.title}
                             </Text>
                             <Text className="mt-1 text-sm text-accent">
-                              {new Date(item.watched_at).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
+                              {new Date(item.watched_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
                             </Text>
-                            <Text className="mt-2 text-xs text-white/65" numberOfLines={2}>
+                            <Text
+                              className="mt-2 text-xs text-white/65"
+                              numberOfLines={2}
+                            >
                               {genres || "Genres unavailable"}
                             </Text>
                           </View>
                           <View className="items-end">
                             <Text
                               className={`text-xs font-semibold ${
-                                mediaType === "tv" ? "text-[#F3B95F]" : "text-accentLight"
+                                mediaType === "tv"
+                                  ? "text-[#F3B95F]"
+                                  : "text-accentLight"
                               }`}
                             >
                               {mediaType === "tv" ? "TV" : "Movie"}
@@ -687,7 +786,8 @@ const Profiles = () => {
                   </View>
                 ) : (
                   <Text className="mt-4 leading-5 text-white/70">
-                    Mark movies or TV shows as watched from a details page to start your log.
+                    Mark movies or TV shows as watched from a details page to
+                    start your log.
                   </Text>
                 )}
               </View>
@@ -697,8 +797,12 @@ const Profiles = () => {
               <>
                 <View className="mt-4 rounded-[26px] border border-white/10 bg-[#141D2D]/95 px-4 py-5">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-xl font-bold text-white">Saved Queue</Text>
-                    <Text className="text-sm text-accentLight">{savedItems.length} saved</Text>
+                    <Text className="text-xl font-bold text-white">
+                      Saved Queue
+                    </Text>
+                    <Text className="text-sm text-accentLight">
+                      {savedItems.length} saved
+                    </Text>
                   </View>
 
                   {savedItems.length > 0 ? (
@@ -710,37 +814,51 @@ const Profiles = () => {
                         >
                           <Image
                             source={{
-                              uri: item.poster_url || "https://placehold.co/600x400/1a1a1a.png",
+                              uri:
+                                item.poster_url ||
+                                "https://placehold.co/600x400/1a1a1a.png",
                             }}
                             className="h-20 w-14 rounded-xl"
                             resizeMode="cover"
                           />
                           <View className="ml-3 flex-1">
-                            <Text className="text-base font-semibold text-white" numberOfLines={1}>
+                            <Text
+                              className="text-base font-semibold text-white"
+                              numberOfLines={1}
+                            >
                               {item.title}
                             </Text>
-                              <Text className="mt-1 text-sm text-[#9FD6E3]">
-                                {item.release_date?.split("-")[0] || "Saved"} ·{" "}
-                                {(item.media_type ?? "movie") === "tv" ? "TV" : "Movie"}
-                              </Text>
-                            </View>
+                            <Text className="mt-1 text-sm text-[#9FD6E3]">
+                              {item.release_date?.split("-")[0] || "Saved"} ·{" "}
+                              {(item.media_type ?? "movie") === "tv"
+                                ? "TV"
+                                : "Movie"}
+                            </Text>
+                          </View>
                           <Text className="text-sm text-white/65">
-                            {item.vote_average ? `${Math.round(item.vote_average)}/10` : ""}
+                            {item.vote_average
+                              ? `${Math.round(item.vote_average)}/10`
+                              : ""}
                           </Text>
                         </View>
                       ))}
                     </View>
                   ) : (
                     <Text className="mt-4 leading-5 text-white/70">
-                      Use the bookmark button on a movie or TV show to save it to your default queue.
+                      Use the bookmark button on a movie or TV show to save it
+                      to your default queue.
                     </Text>
                   )}
                 </View>
 
                 <View className="mt-4 rounded-[26px] border border-white/10 bg-[#141D2D]/95 px-4 py-5">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-xl font-bold text-white">Custom Lists</Text>
-                    <Text className="text-sm text-accent">{customLists.length} lists</Text>
+                    <Text className="text-xl font-bold text-white">
+                      Custom Lists
+                    </Text>
+                    <Text className="text-sm text-accent">
+                      {customLists.length} lists
+                    </Text>
                   </View>
 
                   {customLists.length > 0 ? (
@@ -754,12 +872,17 @@ const Profiles = () => {
                             className="rounded-[22px] border border-white/10 bg-[#0F1725] px-4 py-4"
                           >
                             <View className="flex-row items-center justify-between">
-                              <Text className="text-base font-semibold text-white">{list.name}</Text>
+                              <Text className="text-base font-semibold text-white">
+                                {list.name}
+                              </Text>
                               <Text className="text-sm text-accentLight">
                                 {items.length} items
                               </Text>
                             </View>
-                            <Text className="mt-2 text-sm text-white/65" numberOfLines={1}>
+                            <Text
+                              className="mt-2 text-sm text-white/65"
+                              numberOfLines={1}
+                            >
                               {items.length > 0
                                 ? items
                                     .slice(0, 3)
@@ -773,7 +896,8 @@ const Profiles = () => {
                     </View>
                   ) : (
                     <Text className="mt-4 leading-5 text-white/70">
-                      Create custom lists from the Saved tab to organize themed watchlists.
+                      Create custom lists from the Saved tab to organize themed
+                      watchlists.
                     </Text>
                   )}
                 </View>

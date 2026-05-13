@@ -2,35 +2,35 @@ import { icons } from "@/constants/icon";
 import { images } from "@/constants/images";
 import { fetchTvDetails } from "@/services/api";
 import {
-    addMediaToList,
-    createList,
-    getLists,
-    getMediaListStatus,
-    markMediaWatched,
-    removeMediaFromList,
-    removeSavedMedia,
-    saveMedia,
+  addMediaToList,
+  createList,
+  getLists,
+  getMediaListStatus,
+  markMediaWatched,
+  removeMediaFromList,
+  removeSavedMedia,
+  saveMedia,
 } from "@/services/appwrite";
 import {
-    getListDestinationLabel,
-    isSavedList,
-    planSingleListDestination,
+  getListDestinationLabel,
+  isSavedList,
+  planSingleListDestination,
 } from "@/services/listSelection";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -339,7 +339,7 @@ const TvDetails = () => {
 
               <Image
                 source={images.framelogIcon}
-                className="size-12"
+                className="size-8"
                 resizeMode="contain"
               />
 
@@ -421,9 +421,7 @@ const TvDetails = () => {
                 >
                   <ActionIconLabel
                     icon="+"
-                    label={
-                      listPickerLoading ? "Updating..." : currentListLabel
-                    }
+                    label={listPickerLoading ? "Updating..." : currentListLabel}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -577,7 +575,9 @@ const TvDetails = () => {
               disabled={listPickerLoading || creatingList}
             >
               <View>
-                <Text className="text-base font-semibold text-white">Saved</Text>
+                <Text className="text-base font-semibold text-white">
+                  Saved
+                </Text>
                 {saved && showCustomListIds.length === 0 ? (
                   <Text className="mt-1 text-xs text-accentLight">
                     Already in this list

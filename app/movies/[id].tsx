@@ -333,7 +333,7 @@ const MovieDetails = () => {
 
               <Image
                 source={images.framelogIcon}
-                className="size-12"
+                className="size-10"
                 resizeMode="contain"
               />
 
