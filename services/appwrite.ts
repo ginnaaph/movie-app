@@ -3,6 +3,7 @@ import {
   getMediaFieldFallbackPayloads,
   optionalMediaMetadataKeys,
 } from "./appwritePayloads";
+import { getListItemMetadataRepairPayload } from "./listItemMetadata";
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -419,6 +420,24 @@ const toListItemFromMetricRow = (
   added_at: new Date().toISOString(),
 });
 
+const toListItemFromWatchHistoryEntry = (
+  entry: WatchHistoryEntry,
+  userId: string,
+  listId: string,
+): ListItem => ({
+  $id: entry.$id,
+  user_id: userId,
+  list_id: listId,
+  movie_id: getRowMediaId(entry),
+  media_id: entry.media_id ?? entry.movie_id,
+  media_type: getRowMediaType(entry),
+  title: entry.title,
+  poster_url: entry.poster_url,
+  release_date: entry.release_date,
+  vote_average: entry.vote_average,
+  added_at: entry.watched_at,
+});
+
 const getSavedMetricsRows = async (
   userId: string,
 ): Promise<TrendingMovie[]> => {
@@ -744,6 +763,7 @@ export const createList = async (name: string): Promise<MovieList> => {
 export const getListItems = async (listId: string): Promise<ListItem[]> => {
   const userId = await getCurrentUserId();
   const savedList = await getDefaultSavedList(userId);
+  const watchedList = await getDefaultWatchedList(userId);
 
   const resolvedListId =
     listId === DEFAULT_SAVED_LIST_ID ? savedList.$id : listId;
@@ -759,6 +779,42 @@ export const getListItems = async (listId: string): Promise<ListItem[]> => {
   const sortedRows = rows.sort((left, right) =>
     right.added_at.localeCompare(left.added_at),
   );
+
+  if (resolvedListId === watchedList.$id) {
+    const historyRows = (await getWatchHistory("all")).map((entry) =>
+      toListItemFromWatchHistoryEntry(entry, userId, watchedList.$id),
+    );
+    const historyByKey = new Map(
+      historyRows.map((item) => [
+        `${getRowMediaType(item)}:${getRowMediaId(item)}`,
+        item,
+      ]),
+    );
+    const seen = new Set<string>();
+
+    return [...sortedRows, ...historyRows]
+      .map((item) => {
+        const key = `${getRowMediaType(item)}:${getRowMediaId(item)}`;
+        const historyItem = historyByKey.get(key);
+
+        if (!item.poster_url && historyItem?.poster_url) {
+          return {
+            ...item,
+            poster_url: historyItem.poster_url,
+            release_date: item.release_date ?? historyItem.release_date,
+            vote_average: item.vote_average ?? historyItem.vote_average,
+          };
+        }
+
+        return item;
+      })
+      .filter((item) => {
+        const key = `${getRowMediaType(item)}:${getRowMediaId(item)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
 
   if (resolvedListId !== savedList.$id) {
     return sortedRows;
@@ -795,7 +851,29 @@ export const addMediaToList = async (
     matchesMedia(item, media.id, mediaType),
   );
   if (existingMediaRow) {
-    return existingMediaRow;
+    const metadata = {
+      title: getMediaTitle(media),
+      poster_url: toPosterUrl(media.poster_path),
+      release_date: getMediaReleaseDate(media),
+      vote_average: media.vote_average,
+    };
+    const repairPayload = getListItemMetadataRepairPayload({
+      existing: existingMediaRow,
+      next: metadata,
+    });
+
+    if (!repairPayload) {
+      return existingMediaRow;
+    }
+
+    const repaired = await updateRowWithMediaFieldFallback({
+      tableId: LIST_ITEMS_TABLE_ID,
+      rowId: existingMediaRow.$id,
+      mediaId: media.id,
+      data: repairPayload,
+    });
+
+    return repaired as unknown as ListItem;
   }
 
   const created = await createRowWithMediaFieldFallback({

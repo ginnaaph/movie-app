@@ -1,4 +1,3 @@
-import FrameLogWordmark from "@/components/FrameLogWordmark";
 import SavedCard from "@/components/SavedMovieCard";
 import SearchBar from "@/components/SearchBar";
 import { images } from "@/constants/images";
@@ -111,7 +110,11 @@ const Saved = () => {
         ) : (
           <>
             <View className="items-center px-2">
-              <FrameLogWordmark scale={1.8} />
+              <Image
+                source={images.framelogIcon}
+                className="size-16"
+                resizeMode="contain"
+              />
             </View>
 
             <View className="px-2">

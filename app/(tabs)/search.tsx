@@ -1,5 +1,4 @@
 import { MovieCard } from "@/components/MovieCard";
-import FrameLogWordmark from "@/components/FrameLogWordmark";
 import SearchBar from "@/components/SearchBar";
 import TrendingCard from "@/components/TrendingCard";
 import { images } from "@/constants/images";
@@ -96,7 +95,11 @@ const Search = () => {
         ListHeaderComponent={
           <>
             <View className="mt-20 w-full flex-row items-center justify-center">
-              <FrameLogWordmark scale={1.6} />
+              <Image
+                source={images.framelogIcon}
+                className="size-16"
+                resizeMode="contain"
+              />
             </View>
             <View className="my-5">
               <View className="mb-4 flex-row rounded-full border border-white/10 bg-[#111A28]/80 p-1">

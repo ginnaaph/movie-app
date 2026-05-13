@@ -1,7 +1,7 @@
 import navybg from "../assets/bg/navybg.jpg";
-import framelogLogo from "../assets/icon/framelog-logo.png";
+import framelogIcon from "../assets/icon/FrameLog.png";
 
 export const images = {
   navybg,
-  framelogLogo,
+  framelogIcon,
 };

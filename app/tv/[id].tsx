@@ -1,5 +1,5 @@
-import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { icons } from "@/constants/icon";
+import { images } from "@/constants/images";
 import { fetchTvDetails } from "@/services/api";
 import {
     addMediaToList,
@@ -337,7 +337,11 @@ const TvDetails = () => {
                 <Text className="text-3xl font-semibold text-white">‹</Text>
               </TouchableOpacity>
 
-              <FrameLogWordmark scale={1.15} />
+              <Image
+                source={images.framelogIcon}
+                className="size-12"
+                resizeMode="contain"
+              />
 
               <TouchableOpacity
                 className="size-11 items-center justify-center rounded-full border border-white/15 bg-[#111A28]/70"

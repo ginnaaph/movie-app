@@ -4,7 +4,7 @@
     "slug": "movie-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon/framelog-logo.png",
+    "icon": "./assets/icon/FrameLog.png",
     "scheme": "movieapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,16 +14,16 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0F1120",
-        "foregroundImage": "./assets/icon/framelog-logo.png",
+        "foregroundImage": "./assets/icon/FrameLog.png",
         "backgroundImage": "./assets/bg/navybg.jpg",
-        "monochromeImage": "./assets/icon/framelog-logo.png"
+        "monochromeImage": "./assets/icon/FrameLog.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/icon/framelog-logo.png"
+      "favicon": "./assets/icon/FrameLog.png"
     },
     "plugins": [
       "expo-router",

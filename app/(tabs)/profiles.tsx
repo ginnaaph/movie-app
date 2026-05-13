@@ -1,4 +1,3 @@
-import FrameLogWordmark from "@/components/FrameLogWordmark";
 import { images } from "@/constants/images";
 import { fetchMovieDetails, fetchTvDetails } from "@/services/api";
 import {
@@ -314,6 +313,7 @@ const Profiles = () => {
   );
   const movieChartPoints = getChartPoints(movieChart, chartWidth, maxChartValue);
   const tvChartPoints = getChartPoints(tvChart, chartWidth, maxChartValue);
+  const axisChartPoints = getChartPoints(axisChart, chartWidth, maxChartValue);
   const allWatchMinutes = getWatchMinutes(allWatchHistory, watchDetailsById, tvDetailsById);
   const rangeWatchMinutes = getWatchMinutes(rangedHistory, watchDetailsById, tvDetailsById);
   const topGenres = getGenreBreakdown(rangedHistory, watchDetailsById, tvDetailsById);
@@ -334,7 +334,11 @@ const Profiles = () => {
         ) : (
           <>
             <View className="items-center px-2">
-              <FrameLogWordmark scale={1.8} />
+              <Image
+                source={images.framelogIcon}
+                className="size-16"
+                resizeMode="contain"
+              />
             </View>
 
             <View className="px-2">
@@ -560,11 +564,15 @@ const Profiles = () => {
                       </View>
                     </View>
 
-                    <View className="mt-5 flex-row justify-between px-1">
-                      {axisChart.map((bucket) => (
+                    <View
+                      className="mt-5 px-3"
+                      style={{ height: 18, width: chartWidth || "100%" }}
+                    >
+                      {axisChartPoints.map((bucket) => (
                         <Text
                           key={bucket.label}
-                          className="text-xs font-medium text-white/65"
+                          className="absolute w-10 text-center text-xs font-medium text-white/65"
+                          style={{ left: bucket.x - 20 }}
                         >
                           {bucket.label}
                         </Text>
