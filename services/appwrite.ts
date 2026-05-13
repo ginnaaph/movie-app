@@ -1,4 +1,8 @@
 import { Account, Client, ID, Query, TablesDB } from "react-native-appwrite";
+import {
+  getMediaFieldFallbackPayloads,
+  optionalMediaMetadataKeys,
+} from "./appwritePayloads";
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -180,21 +184,33 @@ const listRowsByMediaId = async <T>({
   }
 };
 
-const withMediaIdPayload = <T extends Record<string, unknown>>(
-  data: T,
-  mediaId: number,
-): T & { media_id?: number; movie_id?: number } => ({
-  ...data,
-  media_id: mediaId,
-  movie_id: mediaId,
-});
+const isMediaSchemaCompatibilityError = (error: unknown) =>
+  isUnknownAttributeError(error, "media_type") ||
+  isUnknownAttributeError(error, "media_id") ||
+  isUnknownAttributeError(error, "movie_id") ||
+  optionalMediaMetadataKeys.some((attribute) =>
+    isUnknownAttributeError(error, attribute),
+  );
 
-const omitKey = (
-  payload: Record<string, unknown>,
-  key: string,
-): Record<string, unknown> => {
-  const { [key]: _removed, ...rest } = payload;
-  return rest;
+const runWithMediaFieldFallback = async <T>(
+  payloads: Record<string, unknown>[],
+  operation: (payload: Record<string, unknown>) => Promise<T>,
+): Promise<T> => {
+  let lastCompatibilityError: unknown;
+
+  for (const payload of payloads) {
+    try {
+      return await operation(payload);
+    } catch (error) {
+      if (!isMediaSchemaCompatibilityError(error)) {
+        throw error;
+      }
+
+      lastCompatibilityError = error;
+    }
+  }
+
+  throw lastCompatibilityError;
 };
 
 const createRowWithMediaFieldFallback = async ({
@@ -214,44 +230,10 @@ const createRowWithMediaFieldFallback = async ({
       data: payload,
     });
 
-  const withMediaIds = withMediaIdPayload(data, mediaId);
-
-  try {
-    return await createWithData(withMediaIds);
-  } catch (error) {
-    if (isUnknownAttributeError(error, "media_type")) {
-      const payloadWithoutMediaType = omitKey(withMediaIds, "media_type");
-      try {
-        return await createWithData(payloadWithoutMediaType);
-      } catch (fallbackError) {
-        if (isUnknownAttributeError(fallbackError, "movie_id")) {
-          return createWithData({
-            ...omitKey(data, "media_type"),
-            media_id: mediaId,
-          });
-        }
-
-        if (isUnknownAttributeError(fallbackError, "media_id")) {
-          return createWithData({
-            ...omitKey(data, "media_type"),
-            movie_id: mediaId,
-          });
-        }
-
-        throw fallbackError;
-      }
-    }
-
-    if (isUnknownAttributeError(error, "movie_id")) {
-      return createWithData({ ...data, media_id: mediaId });
-    }
-
-    if (isUnknownAttributeError(error, "media_id")) {
-      return createWithData({ ...data, movie_id: mediaId });
-    }
-
-    throw error;
-  }
+  return runWithMediaFieldFallback(
+    getMediaFieldFallbackPayloads(data, mediaId),
+    createWithData,
+  );
 };
 
 const updateRowWithMediaFieldFallback = async ({
@@ -273,44 +255,10 @@ const updateRowWithMediaFieldFallback = async ({
       data: payload,
     });
 
-  const withMediaIds = withMediaIdPayload(data, mediaId);
-
-  try {
-    return await updateWithData(withMediaIds);
-  } catch (error) {
-    if (isUnknownAttributeError(error, "media_type")) {
-      const payloadWithoutMediaType = omitKey(withMediaIds, "media_type");
-      try {
-        return await updateWithData(payloadWithoutMediaType);
-      } catch (fallbackError) {
-        if (isUnknownAttributeError(fallbackError, "movie_id")) {
-          return updateWithData({
-            ...omitKey(data, "media_type"),
-            media_id: mediaId,
-          });
-        }
-
-        if (isUnknownAttributeError(fallbackError, "media_id")) {
-          return updateWithData({
-            ...omitKey(data, "media_type"),
-            movie_id: mediaId,
-          });
-        }
-
-        throw fallbackError;
-      }
-    }
-
-    if (isUnknownAttributeError(error, "movie_id")) {
-      return updateWithData({ ...data, media_id: mediaId });
-    }
-
-    if (isUnknownAttributeError(error, "media_id")) {
-      return updateWithData({ ...data, movie_id: mediaId });
-    }
-
-    throw error;
-  }
+  return runWithMediaFieldFallback(
+    getMediaFieldFallbackPayloads(data, mediaId),
+    updateWithData,
+  );
 };
 
 const slugify = (value: string) =>
@@ -474,16 +422,24 @@ const toListItemFromMetricRow = (
 const getSavedMetricsRows = async (
   userId: string,
 ): Promise<TrendingMovie[]> => {
-  const rows = await listRowsAll<TrendingMovie>({
-    tableId: SEARCH_METRICS_TABLE_ID,
-    queries: [
-      Query.equal("user_id", userId),
-      Query.equal("saved", true),
-      Query.orderDesc("$createdAt"),
-    ],
-  });
+  try {
+    const rows = await listRowsAll<TrendingMovie>({
+      tableId: SEARCH_METRICS_TABLE_ID,
+      queries: [
+        Query.equal("user_id", userId),
+        Query.equal("saved", true),
+        Query.orderDesc("$createdAt"),
+      ],
+    });
 
-  return rows;
+    return rows;
+  } catch (error) {
+    if (isUnknownAttributeError(error, "saved")) {
+      return [];
+    }
+
+    throw error;
+  }
 };
 
 const getMetricsRowByMediaId = async (
@@ -500,17 +456,6 @@ const getMetricsRowByMediaId = async (
   return rows.find((row) => matchesMedia(row, mediaId, mediaType)) ?? null;
 };
 
-const getSystemLists = (userId: string): MovieList[] => [
-  {
-    $id: DEFAULT_SAVED_LIST_ID,
-    user_id: userId,
-    name: "Saved",
-    slug: DEFAULT_SAVED_LIST_SLUG,
-    type: "system",
-    is_default: true,
-  },
-];
-
 const mergeLists = (lists: MovieList[]) => {
   const seen = new Set<string>();
   return lists.filter((list) => {
@@ -518,6 +463,37 @@ const mergeLists = (lists: MovieList[]) => {
     seen.add(list.$id);
     return true;
   });
+};
+
+const getDefaultSavedList = async (userId: string): Promise<MovieList> => {
+  const existing = await tables.listRows({
+    databaseId: DATABASE_ID,
+    tableId: MOVIE_LISTS_TABLE_ID,
+    queries: [
+      Query.equal("user_id", userId),
+      Query.equal("slug", DEFAULT_SAVED_LIST_SLUG),
+      Query.limit(1),
+    ],
+  });
+
+  if (existing.rows.length > 0) {
+    return existing.rows[0] as unknown as MovieList;
+  }
+
+  const created = await tables.createRow({
+    databaseId: DATABASE_ID,
+    tableId: MOVIE_LISTS_TABLE_ID,
+    rowId: ID.unique(),
+    data: {
+      user_id: userId,
+      name: "Saved",
+      slug: DEFAULT_SAVED_LIST_SLUG,
+      type: "system",
+      is_default: true,
+    },
+  });
+
+  return created as unknown as MovieList;
 };
 
 const getDefaultWatchedList = async (userId: string): Promise<MovieList> => {
@@ -687,7 +663,10 @@ export const upsertUserProfile = async (
 
 export const getLists = async (): Promise<MovieList[]> => {
   const userId = await getCurrentUserId();
-  const watchedList = await getDefaultWatchedList(userId);
+  const [savedList, watchedList] = await Promise.all([
+    getDefaultSavedList(userId),
+    getDefaultWatchedList(userId),
+  ]);
 
   const rows = await listRowsAll<MovieList>({
     tableId: MOVIE_LISTS_TABLE_ID,
@@ -695,10 +674,11 @@ export const getLists = async (): Promise<MovieList[]> => {
   });
 
   const merged = mergeLists([
-    ...getSystemLists(userId),
+    savedList,
     watchedList,
     ...rows.filter(
       (list) =>
+        list.$id !== savedList.$id &&
         list.$id !== watchedList.$id &&
         list.slug !== DEFAULT_SAVED_LIST_SLUG &&
         list.slug !== DEFAULT_WATCHED_LIST_SLUG,
@@ -763,24 +743,38 @@ export const createList = async (name: string): Promise<MovieList> => {
 
 export const getListItems = async (listId: string): Promise<ListItem[]> => {
   const userId = await getCurrentUserId();
+  const savedList = await getDefaultSavedList(userId);
 
-  if (listId === DEFAULT_SAVED_LIST_ID) {
-    const rows = await getSavedMetricsRows(userId);
-    return rows.map((row) => toListItemFromMetricRow(row, userId));
-  }
-
+  const resolvedListId =
+    listId === DEFAULT_SAVED_LIST_ID ? savedList.$id : listId;
   const rows = await listRowsAll<ListItem>({
     tableId: LIST_ITEMS_TABLE_ID,
     queries: [
       Query.equal("user_id", userId),
-      Query.equal("list_id", listId),
+      Query.equal("list_id", resolvedListId),
       Query.orderDesc("added_at"),
     ],
   });
 
-  return rows.sort((left, right) =>
+  const sortedRows = rows.sort((left, right) =>
     right.added_at.localeCompare(left.added_at),
   );
+
+  if (resolvedListId !== savedList.$id) {
+    return sortedRows;
+  }
+
+  const legacyRows = (await getSavedMetricsRows(userId)).map((row) =>
+    toListItemFromMetricRow(row, userId),
+  );
+  const seen = new Set<string>();
+
+  return [...sortedRows, ...legacyRows].filter((item) => {
+    const key = `${getRowMediaType(item)}:${getRowMediaId(item)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 export const addMediaToList = async (
@@ -862,21 +856,28 @@ export const getMediaListStatus = async (
   mediaId: number,
   mediaType: MediaType = "movie",
 ): Promise<MovieListStatus> => {
+  const userId = await getCurrentUserId();
   const [lists, itemsResult, metricRow] = await Promise.all([
     getLists(),
-    getListItemsByMediaId(await getCurrentUserId(), mediaId, mediaType),
-    getMetricsRowByMediaId(await getCurrentUserId(), mediaId, mediaType),
+    getListItemsByMediaId(userId, mediaId, mediaType),
+    getMetricsRowByMediaId(userId, mediaId, mediaType),
   ]);
 
+  const savedList = lists.find((list) => list.slug === DEFAULT_SAVED_LIST_SLUG);
   const watchedList = lists.find(
     (list) => list.slug === DEFAULT_WATCHED_LIST_SLUG,
   );
   const customListIds = itemsResult
-    .filter((item) => item.list_id !== watchedList?.$id)
+    .filter(
+      (item) =>
+        item.list_id !== savedList?.$id && item.list_id !== watchedList?.$id,
+    )
     .map((item) => item.list_id);
 
   return {
-    saved: Boolean(metricRow?.saved),
+    saved:
+      Boolean(metricRow?.saved) ||
+      itemsResult.some((item) => item.list_id === savedList?.$id),
     watched: watchedList
       ? itemsResult.some((item) => item.list_id === watchedList.$id)
       : false,
@@ -894,6 +895,9 @@ export const saveMedia = async (
   mediaType: MediaType = "movie",
 ): Promise<TrendingMovie> => {
   const userId = await getCurrentUserId();
+  const savedList = await getDefaultSavedList(userId);
+  await addMediaToList(savedList.$id, media, mediaType);
+
   const existing = await getMetricsRowByMediaId(userId, media.id, mediaType);
 
   if (existing) {
@@ -944,13 +948,16 @@ export const removeSavedMedia = async (
   mediaType: MediaType = "movie",
 ): Promise<void> => {
   const userId = await getCurrentUserId();
+  const savedList = await getDefaultSavedList(userId);
+  await removeMediaFromList(savedList.$id, mediaId, mediaType);
+
   const existing = await getMetricsRowByMediaId(userId, mediaId, mediaType);
   if (!existing) return;
 
-  await tables.updateRow({
-    databaseId: DATABASE_ID,
+  await updateRowWithMediaFieldFallback({
     tableId: SEARCH_METRICS_TABLE_ID,
     rowId: existing.$id,
+    mediaId,
     data: { saved: false },
   });
 };

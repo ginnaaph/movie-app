@@ -137,7 +137,11 @@ const MovieDetails = () => {
         setSaved(status.saved);
         setWatched(status.watched);
         setMovieCustomListIds(status.customListIds);
-        setCustomLists(allLists.filter((list) => list.type === "custom"));
+        setCustomLists(
+          allLists.filter(
+            (list) => list.slug === "saved-list" || list.type === "custom",
+          ),
+        );
       } catch {}
     };
 
@@ -210,6 +214,29 @@ const MovieDetails = () => {
 
   const handleToggleCustomList = async (list: MovieList) => {
     if (!movie || listPickerLoading) return;
+    if (list.slug === "saved-list") {
+      try {
+        setListPickerLoading(true);
+        if (saved) {
+          await removeSavedMovie(movie.id);
+          setSaved(false);
+        } else {
+          await saveMovie(movie);
+          setSaved(true);
+        }
+      } catch (error) {
+        const message = getErrorMessage(
+          error,
+          "The default list could not be updated right now.",
+        );
+        console.error("toggleMovieSavedList failed", error);
+        Alert.alert("List update failed", message);
+      } finally {
+        setListPickerLoading(false);
+      }
+      return;
+    }
+
     const isInList = movieCustomListIds.includes(list.$id);
     try {
       setListPickerLoading(true);
@@ -518,7 +545,10 @@ const MovieDetails = () => {
               keyExtractor={(item) => item.$id}
               scrollEnabled={false}
               renderItem={({ item }) => {
-                const isInList = movieCustomListIds.includes(item.$id);
+                const isInList =
+                  item.slug === "saved-list"
+                    ? saved
+                    : movieCustomListIds.includes(item.$id);
                 return (
                   <TouchableOpacity
                     className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-4"

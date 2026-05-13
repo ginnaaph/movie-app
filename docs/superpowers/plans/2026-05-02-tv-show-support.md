@@ -8,6 +8,10 @@
 
 **Tech Stack:** Expo Router, React Native, NativeWind, TMDB API, react-native-appwrite, TypeScript.
 
+**Current Status:**
+- [x] Fixed add-to-list fallback for Appwrite tables that do not yet have every media-aware column.
+- [ ] Today's to do: TV show database.
+
 ---
 
 ### Task 1: Shared Media Types And API
