@@ -3,6 +3,7 @@ import { icons } from "@/constants/icon";
 import { fetchTvDetails } from "@/services/api";
 import {
     addMediaToList,
+    createList,
     getLists,
     getMediaListStatus,
     markMediaWatched,
@@ -10,6 +11,11 @@ import {
     removeSavedMedia,
     saveMedia,
 } from "@/services/appwrite";
+import {
+    getListDestinationLabel,
+    isSavedList,
+    planSingleListDestination,
+} from "@/services/listSelection";
 import { useFetch } from "@/services/useFetch";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -22,6 +28,7 @@ import {
     Modal,
     ScrollView,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -114,13 +121,16 @@ const TvDetails = () => {
   const { data: show, loading } = useFetch(() => fetchTvDetails(id as string));
   const [saved, setSaved] = useState(false);
   const [watched, setWatched] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
   const [expandedOverview, setExpandedOverview] = useState(false);
   const [customLists, setCustomLists] = useState<MovieList[]>([]);
   const [showCustomListIds, setShowCustomListIds] = useState<string[]>([]);
   const [showListPicker, setShowListPicker] = useState(false);
   const [listPickerLoading, setListPickerLoading] = useState(false);
+  const [showOtherLists, setShowOtherLists] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [creatingList, setCreatingList] = useState(false);
+  const [listPickerMessage, setListPickerMessage] = useState("");
 
   useEffect(() => {
     const loadShowState = async () => {
@@ -175,28 +185,90 @@ const TvDetails = () => {
     show?.status || null,
     show?.spoken_languages?.[0]?.english_name ?? null,
   ].filter(Boolean) as string[];
+  const savedList = customLists.find(isSavedList);
+  const otherLists = customLists.filter((list) => !isSavedList(list));
+  const currentListLabel = getListDestinationLabel({
+    currentSaved: saved,
+    currentCustomListIds: showCustomListIds,
+    lists: customLists,
+  });
 
-  const handleDefaultSavePress = async () => {
-    if (!show || saveLoading) return;
+  const applyListDestination = async (destinationList: MovieList) => {
+    if (!show || listPickerLoading || !savedList) return;
+
+    const plan = planSingleListDestination({
+      destinationList,
+      savedList,
+      currentSaved: saved,
+      currentCustomListIds: showCustomListIds,
+    });
+
+    if (plan.alreadyInDestination) {
+      setListPickerMessage(`Already in ${destinationList.name}.`);
+      return;
+    }
 
     try {
-      setSaveLoading(true);
-      if (saved) {
-        await removeSavedMedia(show.id, "tv");
-        setSaved(false);
-      } else {
+      setListPickerMessage("");
+      setListPickerLoading(true);
+
+      await Promise.all([
+        ...plan.customListIdsToRemove.map((listId) =>
+          removeMediaFromList(listId, show.id, "tv"),
+        ),
+        ...(plan.shouldRemoveSaved ? [removeSavedMedia(show.id, "tv")] : []),
+      ]);
+
+      if (plan.shouldAddSaved) {
         await saveMedia(show, "tv");
-        setSaved(true);
       }
+
+      await Promise.all(
+        plan.customListIdsToAdd.map((listId) =>
+          addMediaToList(listId, show, "tv"),
+        ),
+      );
+
+      if (isSavedList(destinationList)) {
+        setSaved(true);
+        setShowCustomListIds([]);
+      } else {
+        setSaved(false);
+        setShowCustomListIds([destinationList.$id]);
+      }
+
+      setListPickerMessage(`Moved to ${destinationList.name}.`);
     } catch (error) {
       const message = getErrorMessage(
         error,
-        "The TV show could not be updated right now.",
+        "The list could not be updated right now.",
       );
-      console.error("saveMedia(tv) failed", error);
-      Alert.alert("Save failed", message);
+      console.error("moveTvListDestination failed", error);
+      Alert.alert("List update failed", message);
     } finally {
-      setSaveLoading(false);
+      setListPickerLoading(false);
+    }
+  };
+
+  const handleCreateAndSelectList = async () => {
+    if (!newListName.trim() || creatingList || listPickerLoading) return;
+
+    try {
+      setCreatingList(true);
+      const createdList = await createList(newListName);
+      setCustomLists((current) => [...current, createdList]);
+      setNewListName("");
+      setShowOtherLists(true);
+      await applyListDestination(createdList);
+    } catch (error) {
+      const message = getErrorMessage(
+        error,
+        "The list could not be created right now.",
+      );
+      console.error("createTvListDestination failed", error);
+      Alert.alert("Create list failed", message);
+    } finally {
+      setCreatingList(false);
     }
   };
 
@@ -216,56 +288,6 @@ const TvDetails = () => {
       Alert.alert("Watch update failed", message);
     } finally {
       setWatchLoading(false);
-    }
-  };
-
-  const handleToggleCustomList = async (list: MovieList) => {
-    if (!show || listPickerLoading) return;
-    if (list.slug === "saved-list") {
-      try {
-        setListPickerLoading(true);
-        if (saved) {
-          await removeSavedMedia(show.id, "tv");
-          setSaved(false);
-        } else {
-          await saveMedia(show, "tv");
-          setSaved(true);
-        }
-      } catch (error) {
-        const message = getErrorMessage(
-          error,
-          "The default list could not be updated right now.",
-        );
-        console.error("toggleTvSavedList failed", error);
-        Alert.alert("List update failed", message);
-      } finally {
-        setListPickerLoading(false);
-      }
-      return;
-    }
-
-    const isInList = showCustomListIds.includes(list.$id);
-
-    try {
-      setListPickerLoading(true);
-      if (isInList) {
-        await removeMediaFromList(list.$id, show.id, "tv");
-        setShowCustomListIds((current) =>
-          current.filter((listId) => listId !== list.$id),
-        );
-      } else {
-        await addMediaToList(list.$id, show, "tv");
-        setShowCustomListIds((current) => [...current, list.$id]);
-      }
-    } catch (error) {
-      const message = getErrorMessage(
-        error,
-        "The list could not be updated right now.",
-      );
-      console.error("toggleTvCustomList failed", error);
-      Alert.alert("List update failed", message);
-    } finally {
-      setListPickerLoading(false);
     }
   };
 
@@ -319,7 +341,7 @@ const TvDetails = () => {
 
               <TouchableOpacity
                 className="size-11 items-center justify-center rounded-full border border-white/15 bg-[#111A28]/70"
-                onPress={handleDefaultSavePress}
+                onPress={() => setShowListPicker(true)}
               >
                 <Image
                   source={icons.saved}
@@ -387,18 +409,16 @@ const TvDetails = () => {
               <View className="mt-6 flex-row gap-x-3">
                 <TouchableOpacity
                   className={`flex-1 rounded-2xl px-4 py-3.5 ${
-                    saved ? "bg-accentLight" : "bg-[#1A2740]/90"
+                    saved || showCustomListIds.length > 0
+                      ? "bg-accentLight"
+                      : "bg-[#1A2740]/90"
                   }`}
-                  onPress={handleDefaultSavePress}
+                  onPress={() => setShowListPicker(true)}
                 >
                   <ActionIconLabel
                     icon="+"
                     label={
-                      saveLoading
-                        ? "Saving..."
-                        : saved
-                          ? "In My List"
-                          : "My List"
+                      listPickerLoading ? "Updating..." : currentListLabel
                     }
                   />
                 </TouchableOpacity>
@@ -412,12 +432,6 @@ const TvDetails = () => {
                     icon="✓"
                     label={watchLoading ? "Updating..." : "Watched"}
                   />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="w-14 items-center justify-center rounded-2xl bg-[#1A2740]/90 py-3.5"
-                  onPress={() => setShowListPicker(true)}
-                >
-                  <Text className="text-lg font-semibold text-white">☰</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -538,7 +552,7 @@ const TvDetails = () => {
         />
         <View className="rounded-t-3xl border-t border-white/10 bg-[#0C1420] px-5 pb-12 pt-5">
           <View className="mb-5 flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-white">Add to List</Text>
+            <Text className="text-lg font-bold text-white">Save to List</Text>
             <TouchableOpacity onPress={() => setShowListPicker(false)}>
               <Text className="text-sm font-semibold text-accentLight">
                 Done
@@ -546,39 +560,108 @@ const TvDetails = () => {
             </TouchableOpacity>
           </View>
 
-          {customLists.length === 0 ? (
-            <Text className="py-6 text-center text-sm text-white/60">
-              No custom lists yet. Create one from the Saved tab.
+          {listPickerMessage ? (
+            <Text className="mb-4 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold text-accentLight">
+              {listPickerMessage}
             </Text>
-          ) : (
-            <FlatList
-              data={customLists}
-              keyExtractor={(item) => item.$id}
-              scrollEnabled={false}
-              renderItem={({ item }) => {
-                const isInList =
-                  item.slug === "saved-list"
-                    ? saved
-                    : showCustomListIds.includes(item.$id);
-                return (
-                  <TouchableOpacity
-                    className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-4"
-                    onPress={() => handleToggleCustomList(item)}
-                    disabled={listPickerLoading}
-                  >
-                    <Text className="text-base font-semibold text-white">
-                      {item.name}
-                    </Text>
-                    {isInList ? (
-                      <Text className="text-lg text-accentLight">✓</Text>
-                    ) : (
-                      <View className="size-5 rounded-full border border-white/30" />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
+          ) : null}
+
+          {savedList ? (
+            <TouchableOpacity
+              className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-4"
+              onPress={() => applyListDestination(savedList)}
+              disabled={listPickerLoading || creatingList}
+            >
+              <View>
+                <Text className="text-base font-semibold text-white">Saved</Text>
+                {saved && showCustomListIds.length === 0 ? (
+                  <Text className="mt-1 text-xs text-accentLight">
+                    Already in this list
+                  </Text>
+                ) : null}
+              </View>
+              {saved && showCustomListIds.length === 0 ? (
+                <Text className="text-lg text-accentLight">✓</Text>
+              ) : (
+                <View className="size-5 rounded-full border border-white/30" />
+              )}
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#10192A] px-4 py-4"
+            onPress={() => setShowOtherLists((current) => !current)}
+          >
+            <Text className="text-base font-semibold text-white">
+              Other lists
+            </Text>
+            <Text className="text-lg font-semibold text-accentLight">
+              {showOtherLists ? "⌃" : "⌄"}
+            </Text>
+          </TouchableOpacity>
+
+          {showOtherLists ? (
+            <View>
+              <View className="mb-3 flex-row gap-x-2">
+                <TextInput
+                  value={newListName}
+                  onChangeText={setNewListName}
+                  placeholder="New list name"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  className="flex-1 rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-3 text-white"
+                />
+                <TouchableOpacity
+                  className="items-center justify-center rounded-2xl bg-accentLight px-4"
+                  onPress={handleCreateAndSelectList}
+                  disabled={
+                    !newListName.trim() || creatingList || listPickerLoading
+                  }
+                >
+                  <Text className="font-semibold text-white">
+                    {creatingList ? "..." : "Add"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {otherLists.length === 0 ? (
+                <Text className="py-3 text-center text-sm text-white/60">
+                  No other lists yet.
+                </Text>
+              ) : (
+                <FlatList
+                  data={otherLists}
+                  keyExtractor={(item) => item.$id}
+                  scrollEnabled={false}
+                  renderItem={({ item }) => {
+                    const isInList = showCustomListIds.includes(item.$id);
+                    return (
+                      <TouchableOpacity
+                        className="mb-3 flex-row items-center justify-between rounded-2xl border border-white/10 bg-[#1A2740]/90 px-4 py-4"
+                        onPress={() => applyListDestination(item)}
+                        disabled={listPickerLoading || creatingList}
+                      >
+                        <View>
+                          <Text className="text-base font-semibold text-white">
+                            {item.name}
+                          </Text>
+                          {isInList ? (
+                            <Text className="mt-1 text-xs text-accentLight">
+                              Already in this list
+                            </Text>
+                          ) : null}
+                        </View>
+                        {isInList ? (
+                          <Text className="text-lg text-accentLight">✓</Text>
+                        ) : (
+                          <View className="size-5 rounded-full border border-white/30" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              )}
+            </View>
+          ) : null}
         </View>
       </Modal>
     </View>
